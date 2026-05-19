@@ -1,0 +1,3 @@
+[workspace]
+members = ["disasm", "fuzz", "generator"]
+resolver = "2"

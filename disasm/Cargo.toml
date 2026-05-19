@@ -1,0 +1,19 @@
+[package]
+name = "superh"
+version = "0.1.0"
+authors = ["christianttt"]
+edition = "2024"
+description = "Disassembler for the SuperH (SH) instruction set (SH1/2/3/4)"
+license = "MIT"
+repository = "https://github.com/christianttt/superh"
+categories = ["no-std", "parser-implementations"]
+keywords = ["disassembler", "superh", "sh4", "sega", "dreamcast"]
+
+[features]
+default = ["sh1", "sh2", "sh3", "sh4"]
+sh1 = []
+sh2 = ["sh1"]
+sh3 = ["sh2"]
+sh4 = ["sh3"]
+
+[dependencies]

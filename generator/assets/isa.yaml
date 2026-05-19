@@ -1,0 +1,2113 @@
+# SuperH (SH) Instruction Set Architecture Definition
+#
+# Pattern characters:
+#   0 / 1  = fixed bit
+#   n      = Rn field (bits [11:8] by convention, but varies — see below)
+#   m      = Rm field (bits  [7:4] by convention, but varies)
+#   d      = displacement field
+#   i      = immediate field
+#   b      = banked-register index (SH3/SH4)
+#   x      = don't-care bit (ignored in match, not extracted)
+#
+# Field types: reg | freg | dreg | vecreg | bankreg | uimm | simm | disp | branch_target
+#
+# version: sh1 | sh2 | sh3 | sh4
+#   sh2 implies sh1 available, sh3 implies sh2, sh4 implies sh3.
+
+opcodes:
+
+  # ---------------------------------------------------------------------------
+  # Data Transfer
+  # ---------------------------------------------------------------------------
+
+  - name: MovRmRn
+    opcode: "mov"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0011"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: MovImmRn
+    opcode: "mov"
+    args: "#{imm}, {rn}"
+    version: sh1
+    pattern: "1110nnnniiiiiiii"
+    fields: { n: reg, i: simm }
+    defs: [rn]
+    uses: []
+
+  - name: MovwAtDispPcRn
+    opcode: "mov.w"
+    args: "@({disp}, pc), {rn}"
+    version: sh1
+    pattern: "1001nnnndddddddd"
+    fields: { n: reg, d: disp }
+    scale: 2
+    pc_bias: 4
+    defs: [rn]
+    uses: []
+
+  - name: MovlAtDispPcRn
+    opcode: "mov.l"
+    args: "@({disp}, pc), {rn}"
+    version: sh1
+    pattern: "1101nnnndddddddd"
+    fields: { n: reg, d: disp }
+    scale: 4
+    pc_bias: 4
+    defs: [rn]
+    uses: []
+
+  # Store to @Rn
+  - name: MovbRmAtRn
+    opcode: "mov.b"
+    args: "{rm}, @{rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0000"
+    fields: { n: reg, m: reg }
+    defs: []
+    uses: [rm, rn]
+
+  - name: MovwRmAtRn
+    opcode: "mov.w"
+    args: "{rm}, @{rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0001"
+    fields: { n: reg, m: reg }
+    defs: []
+    uses: [rm, rn]
+
+  - name: MovlRmAtRn
+    opcode: "mov.l"
+    args: "{rm}, @{rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0010"
+    fields: { n: reg, m: reg }
+    defs: []
+    uses: [rm, rn]
+
+  # Load from @Rm
+  - name: MovbAtRmRn
+    opcode: "mov.b"
+    args: "@{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0000"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: MovwAtRmRn
+    opcode: "mov.w"
+    args: "@{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0001"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: MovlAtRmRn
+    opcode: "mov.l"
+    args: "@{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0010"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  # Pre-decrement store @-Rn
+  - name: MovbRmAtDecRn
+    opcode: "mov.b"
+    args: "{rm}, @-{rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0100"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: MovwRmAtDecRn
+    opcode: "mov.w"
+    args: "{rm}, @-{rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0101"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: MovlRmAtDecRn
+    opcode: "mov.l"
+    args: "{rm}, @-{rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0110"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  # Post-increment load @Rm+
+  - name: MovbAtRmIncRn
+    opcode: "mov.b"
+    args: "@{rm}+, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0100"
+    fields: { n: reg, m: reg }
+    defs: [rn, rm]
+    uses: [rm]
+
+  - name: MovwAtRmIncRn
+    opcode: "mov.w"
+    args: "@{rm}+, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0101"
+    fields: { n: reg, m: reg }
+    defs: [rn, rm]
+    uses: [rm]
+
+  - name: MovlAtRmIncRn
+    opcode: "mov.l"
+    args: "@{rm}+, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0110"
+    fields: { n: reg, m: reg }
+    defs: [rn, rm]
+    uses: [rm]
+
+  # Displacement store @(disp,Rn) — n is at [7:4], d at [3:0]
+  - name: MovbR0AtDispRn
+    opcode: "mov.b"
+    args: "r0, @({disp}, {rn})"
+    version: sh1
+    pattern: "10000000nnnndddd"
+    fields: { n: reg, d: disp }
+    defs: []
+    uses: [r0, rn]
+
+  - name: MovwR0AtDispRn
+    opcode: "mov.w"
+    args: "r0, @({disp}, {rn})"
+    version: sh1
+    pattern: "10000001nnnndddd"
+    fields: { n: reg, d: disp }
+    scale: 2
+    defs: []
+    uses: [r0, rn]
+
+  - name: MovlRmAtDispRn
+    opcode: "mov.l"
+    args: "{rm}, @({disp}, {rn})"
+    version: sh1
+    pattern: "0001nnnnmmmmdddd"
+    fields: { n: reg, m: reg, d: disp }
+    scale: 4
+    defs: []
+    uses: [rm, rn]
+
+  # Displacement load @(disp,Rm) — m at [7:4], d at [3:0]
+  - name: MovbAtDispRmR0
+    opcode: "mov.b"
+    args: "@({disp}, {rm}), r0"
+    version: sh1
+    pattern: "10000100mmmmdddd"
+    fields: { m: reg, d: disp }
+    defs: [r0]
+    uses: [rm]
+
+  - name: MovwAtDispRmR0
+    opcode: "mov.w"
+    args: "@({disp}, {rm}), r0"
+    version: sh1
+    pattern: "10000101mmmmdddd"
+    fields: { m: reg, d: disp }
+    scale: 2
+    defs: [r0]
+    uses: [rm]
+
+  - name: MovlAtDispRmRn
+    opcode: "mov.l"
+    args: "@({disp}, {rm}), {rn}"
+    version: sh1
+    pattern: "0101nnnnmmmmdddd"
+    fields: { n: reg, m: reg, d: disp }
+    scale: 4
+    defs: [rn]
+    uses: [rm]
+
+  # Indexed (R0+Rm) store/load
+  - name: MovbRmAtR0Rn
+    opcode: "mov.b"
+    args: "{rm}, @(r0, {rn})"
+    version: sh1
+    pattern: "0000nnnnmmmm0100"
+    fields: { n: reg, m: reg }
+    defs: []
+    uses: [r0, rm, rn]
+
+  - name: MovwRmAtR0Rn
+    opcode: "mov.w"
+    args: "{rm}, @(r0, {rn})"
+    version: sh1
+    pattern: "0000nnnnmmmm0101"
+    fields: { n: reg, m: reg }
+    defs: []
+    uses: [r0, rm, rn]
+
+  - name: MovlRmAtR0Rn
+    opcode: "mov.l"
+    args: "{rm}, @(r0, {rn})"
+    version: sh1
+    pattern: "0000nnnnmmmm0110"
+    fields: { n: reg, m: reg }
+    defs: []
+    uses: [r0, rm, rn]
+
+  - name: MovbAtR0RmRn
+    opcode: "mov.b"
+    args: "@(r0, {rm}), {rn}"
+    version: sh1
+    pattern: "0000nnnnmmmm1100"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [r0, rm]
+
+  - name: MovwAtR0RmRn
+    opcode: "mov.w"
+    args: "@(r0, {rm}), {rn}"
+    version: sh1
+    pattern: "0000nnnnmmmm1101"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [r0, rm]
+
+  - name: MovlAtR0RmRn
+    opcode: "mov.l"
+    args: "@(r0, {rm}), {rn}"
+    version: sh1
+    pattern: "0000nnnnmmmm1110"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [r0, rm]
+
+  # GBR-relative
+  - name: MovbR0AtDispGbr
+    opcode: "mov.b"
+    args: "r0, @({disp}, gbr)"
+    version: sh1
+    pattern: "11000000dddddddd"
+    fields: { d: disp }
+    defs: []
+    uses: [r0, gbr]
+
+  - name: MovwR0AtDispGbr
+    opcode: "mov.w"
+    args: "r0, @({disp}, gbr)"
+    version: sh1
+    pattern: "11000001dddddddd"
+    fields: { d: disp }
+    scale: 2
+    defs: []
+    uses: [r0, gbr]
+
+  - name: MovlR0AtDispGbr
+    opcode: "mov.l"
+    args: "r0, @({disp}, gbr)"
+    version: sh1
+    pattern: "11000010dddddddd"
+    fields: { d: disp }
+    scale: 4
+    defs: []
+    uses: [r0, gbr]
+
+  - name: MovbAtDispGbrR0
+    opcode: "mov.b"
+    args: "@({disp}, gbr), r0"
+    version: sh1
+    pattern: "11000100dddddddd"
+    fields: { d: disp }
+    defs: [r0]
+    uses: [gbr]
+
+  - name: MovwAtDispGbrR0
+    opcode: "mov.w"
+    args: "@({disp}, gbr), r0"
+    version: sh1
+    pattern: "11000101dddddddd"
+    fields: { d: disp }
+    scale: 2
+    defs: [r0]
+    uses: [gbr]
+
+  - name: MovlAtDispGbrR0
+    opcode: "mov.l"
+    args: "@({disp}, gbr), r0"
+    version: sh1
+    pattern: "11000110dddddddd"
+    fields: { d: disp }
+    scale: 4
+    defs: [r0]
+    uses: [gbr]
+
+  # MOVA — load effective address
+  - name: Mova
+    opcode: "mova"
+    args: "@({disp}, pc), r0"
+    version: sh1
+    pattern: "11000111dddddddd"
+    fields: { d: disp }
+    scale: 4
+    pc_bias: 4
+    defs: [r0]
+    uses: []
+
+  # MOVT — move T bit
+  - name: Movt
+    opcode: "movt"
+    args: "{rn}"
+    version: sh1
+    pattern: "0000nnnn00101001"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [t]
+
+  # MOVCA.L — move with cache bypass (SH4)
+  - name: MovcalR0AtRn
+    opcode: "movca.l"
+    args: "r0, @{rn}"
+    version: sh4
+    pattern: "0000nnnn11000011"
+    fields: { n: reg }
+    defs: []
+    uses: [r0, rn]
+
+  # SWAP
+  - name: SwapbRmRn
+    opcode: "swap.b"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1000"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: SwapwRmRn
+    opcode: "swap.w"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1001"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  # XTRCT
+  - name: XtrctRmRn
+    opcode: "xtrct"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1101"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  # ---------------------------------------------------------------------------
+  # Arithmetic Operations
+  # ---------------------------------------------------------------------------
+
+  - name: AddRmRn
+    opcode: "add"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm1100"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: AddImmRn
+    opcode: "add"
+    args: "#{imm}, {rn}"
+    version: sh1
+    pattern: "0111nnnniiiiiiii"
+    fields: { n: reg, i: simm }
+    defs: [rn]
+    uses: [rn]
+
+  - name: AddcRmRn
+    opcode: "addc"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm1110"
+    fields: { n: reg, m: reg }
+    defs: [rn, t]
+    uses: [rm, rn, t]
+
+  - name: AddvRmRn
+    opcode: "addv"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm1111"
+    fields: { n: reg, m: reg }
+    defs: [rn, t]
+    uses: [rm, rn]
+
+  - name: CmpeqImmR0
+    opcode: "cmp/eq"
+    args: "#{imm}, r0"
+    version: sh1
+    pattern: "10001000iiiiiiii"
+    fields: { i: simm }
+    defs: [t]
+    uses: [r0]
+
+  - name: CmpeqRmRn
+    opcode: "cmp/eq"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm0000"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: CmpgeRmRn
+    opcode: "cmp/ge"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm0011"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: CmpgtRmRn
+    opcode: "cmp/gt"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm0111"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: CmphiRmRn
+    opcode: "cmp/hi"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm0110"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: CmphsRmRn
+    opcode: "cmp/hs"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm0010"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: CmpplRn
+    opcode: "cmp/pl"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00010101"
+    fields: { n: reg }
+    defs: [t]
+    uses: [rn]
+
+  - name: CmppzRn
+    opcode: "cmp/pz"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00010001"
+    fields: { n: reg }
+    defs: [t]
+    uses: [rn]
+
+  - name: CmpstrRmRn
+    opcode: "cmp/str"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1100"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: Div0sRmRn
+    opcode: "div0s"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm0111"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: Div0u
+    opcode: "div0u"
+    args: ""
+    version: sh1
+    pattern: "0000000000011001"
+    fields: {}
+    defs: [t]
+    uses: []
+
+  - name: Div1RmRn
+    opcode: "div1"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm0100"
+    fields: { n: reg, m: reg }
+    defs: [rn, t]
+    uses: [rm, rn, t]
+
+  - name: DmulslRmRn
+    opcode: "dmuls.l"
+    args: "{rm}, {rn}"
+    version: sh2
+    pattern: "0011nnnnmmmm1101"
+    fields: { n: reg, m: reg }
+    defs: [mach, macl]
+    uses: [rm, rn]
+
+  - name: DmuluRmRn
+    opcode: "dmulu.l"
+    args: "{rm}, {rn}"
+    version: sh2
+    pattern: "0011nnnnmmmm0101"
+    fields: { n: reg, m: reg }
+    defs: [mach, macl]
+    uses: [rm, rn]
+
+  - name: DtRn
+    opcode: "dt"
+    args: "{rn}"
+    version: sh2
+    pattern: "0100nnnn00010000"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: ExtsbRmRn
+    opcode: "exts.b"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1110"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: ExtswRmRn
+    opcode: "exts.w"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1111"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: ExtubRmRn
+    opcode: "extu.b"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1100"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: ExtuwRmRn
+    opcode: "extu.w"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1101"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: MaclAtRmIncAtRnInc
+    opcode: "mac.l"
+    args: "@{rm}+, @{rn}+"
+    version: sh2
+    pattern: "0000nnnnmmmm1111"
+    fields: { n: reg, m: reg }
+    defs: [rn, rm, mach, macl]
+    uses: [rn, rm, mach, macl]
+
+  - name: MacwAtRmIncAtRnInc
+    opcode: "mac.w"
+    args: "@{rm}+, @{rn}+"
+    version: sh1
+    pattern: "0100nnnnmmmm1111"
+    fields: { n: reg, m: reg }
+    defs: [rn, rm, mach, macl]
+    uses: [rn, rm, mach, macl]
+
+  - name: MullRmRn
+    opcode: "mul.l"
+    args: "{rm}, {rn}"
+    version: sh2
+    pattern: "0000nnnnmmmm0111"
+    fields: { n: reg, m: reg }
+    defs: [macl]
+    uses: [rm, rn]
+
+  - name: MulswRmRn
+    opcode: "muls.w"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1111"
+    fields: { n: reg, m: reg }
+    defs: [macl]
+    uses: [rm, rn]
+
+  - name: MuluwRmRn
+    opcode: "mulu.w"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1110"
+    fields: { n: reg, m: reg }
+    defs: [macl]
+    uses: [rm, rn]
+
+  - name: NegRmRn
+    opcode: "neg"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1011"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: NegcRmRn
+    opcode: "negc"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm1010"
+    fields: { n: reg, m: reg }
+    defs: [rn, t]
+    uses: [rm, t]
+
+  - name: SubRmRn
+    opcode: "sub"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm1000"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: SubcRmRn
+    opcode: "subc"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm1010"
+    fields: { n: reg, m: reg }
+    defs: [rn, t]
+    uses: [rm, rn, t]
+
+  - name: SubvRmRn
+    opcode: "subv"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0011nnnnmmmm1011"
+    fields: { n: reg, m: reg }
+    defs: [rn, t]
+    uses: [rm, rn]
+
+  # ---------------------------------------------------------------------------
+  # Logic Operations
+  # ---------------------------------------------------------------------------
+
+  - name: AndRmRn
+    opcode: "and"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1001"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: AndImmR0
+    opcode: "and"
+    args: "#{imm}, r0"
+    version: sh1
+    pattern: "11001001iiiiiiii"
+    fields: { i: uimm }
+    defs: [r0]
+    uses: [r0]
+
+  - name: AndbImmAtR0Gbr
+    opcode: "and.b"
+    args: "#{imm}, @(r0, gbr)"
+    version: sh1
+    pattern: "11001101iiiiiiii"
+    fields: { i: uimm }
+    defs: []
+    uses: [r0, gbr]
+
+  - name: NotRmRn
+    opcode: "not"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0110nnnnmmmm0111"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm]
+
+  - name: OrRmRn
+    opcode: "or"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1011"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: OrImmR0
+    opcode: "or"
+    args: "#{imm}, r0"
+    version: sh1
+    pattern: "11001011iiiiiiii"
+    fields: { i: uimm }
+    defs: [r0]
+    uses: [r0]
+
+  - name: OrbImmAtR0Gbr
+    opcode: "or.b"
+    args: "#{imm}, @(r0, gbr)"
+    version: sh1
+    pattern: "11001111iiiiiiii"
+    fields: { i: uimm }
+    defs: []
+    uses: [r0, gbr]
+
+  - name: TasbAtRn
+    opcode: "tas.b"
+    args: "@{rn}"
+    version: sh1
+    pattern: "0100nnnn00011011"
+    fields: { n: reg }
+    defs: [t]
+    uses: [rn]
+
+  - name: TstRmRn
+    opcode: "tst"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1000"
+    fields: { n: reg, m: reg }
+    defs: [t]
+    uses: [rm, rn]
+
+  - name: TstImmR0
+    opcode: "tst"
+    args: "#{imm}, r0"
+    version: sh1
+    pattern: "11001000iiiiiiii"
+    fields: { i: uimm }
+    defs: [t]
+    uses: [r0]
+
+  - name: TstbImmAtR0Gbr
+    opcode: "tst.b"
+    args: "#{imm}, @(r0, gbr)"
+    version: sh1
+    pattern: "11001100iiiiiiii"
+    fields: { i: uimm }
+    defs: [t]
+    uses: [r0, gbr]
+
+  - name: XorRmRn
+    opcode: "xor"
+    args: "{rm}, {rn}"
+    version: sh1
+    pattern: "0010nnnnmmmm1010"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: XorImmR0
+    opcode: "xor"
+    args: "#{imm}, r0"
+    version: sh1
+    pattern: "11001010iiiiiiii"
+    fields: { i: uimm }
+    defs: [r0]
+    uses: [r0]
+
+  - name: XorbImmAtR0Gbr
+    opcode: "xor.b"
+    args: "#{imm}, @(r0, gbr)"
+    version: sh1
+    pattern: "11001110iiiiiiii"
+    fields: { i: uimm }
+    defs: []
+    uses: [r0, gbr]
+
+  # ---------------------------------------------------------------------------
+  # Shift and Rotate
+  # ---------------------------------------------------------------------------
+
+  - name: RotlRn
+    opcode: "rotl"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00000100"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: RotrRn
+    opcode: "rotr"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00000101"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: RotclRn
+    opcode: "rotcl"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00100100"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn, t]
+
+  - name: RotcrRn
+    opcode: "rotcr"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00100101"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn, t]
+
+  - name: ShadRmRn
+    opcode: "shad"
+    args: "{rm}, {rn}"
+    version: sh3
+    pattern: "0100nnnnmmmm1100"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: ShalRn
+    opcode: "shal"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00100000"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: SharRn
+    opcode: "shar"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00100001"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: ShldRmRn
+    opcode: "shld"
+    args: "{rm}, {rn}"
+    version: sh3
+    pattern: "0100nnnnmmmm1101"
+    fields: { n: reg, m: reg }
+    defs: [rn]
+    uses: [rm, rn]
+
+  - name: ShllRn
+    opcode: "shll"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00000000"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: Shll2Rn
+    opcode: "shll2"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00001000"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: Shll8Rn
+    opcode: "shll8"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00011000"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: Shll16Rn
+    opcode: "shll16"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00101000"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: ShlrRn
+    opcode: "shlr"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00000001"
+    fields: { n: reg }
+    defs: [rn, t]
+    uses: [rn]
+
+  - name: Shlr2Rn
+    opcode: "shlr2"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00001001"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: Shlr8Rn
+    opcode: "shlr8"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00011001"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: Shlr16Rn
+    opcode: "shlr16"
+    args: "{rn}"
+    version: sh1
+    pattern: "0100nnnn00101001"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  # ---------------------------------------------------------------------------
+  # Branch Instructions
+  # ---------------------------------------------------------------------------
+
+  - name: Bt
+    opcode: "bt"
+    args: "{disp}"
+    version: sh1
+    pattern: "10001001dddddddd"
+    fields: { d: branch_target }
+    scale: 2
+    pc_bias: 4
+    defs: []
+    uses: [t]
+
+  - name: Bts
+    opcode: "bt.s"
+    args: "{disp}"
+    version: sh2
+    pattern: "10001101dddddddd"
+    fields: { d: branch_target }
+    scale: 2
+    pc_bias: 4
+    defs: []
+    uses: [t]
+
+  - name: Bf
+    opcode: "bf"
+    args: "{disp}"
+    version: sh1
+    pattern: "10001011dddddddd"
+    fields: { d: branch_target }
+    scale: 2
+    pc_bias: 4
+    defs: []
+    uses: [t]
+
+  - name: Bfs
+    opcode: "bf.s"
+    args: "{disp}"
+    version: sh2
+    pattern: "10001111dddddddd"
+    fields: { d: branch_target }
+    scale: 2
+    pc_bias: 4
+    defs: []
+    uses: [t]
+
+  - name: Bra
+    opcode: "bra"
+    args: "{disp}"
+    version: sh1
+    pattern: "1010dddddddddddd"
+    fields: { d: branch_target }
+    scale: 2
+    pc_bias: 4
+    defs: []
+    uses: []
+
+  - name: Bsr
+    opcode: "bsr"
+    args: "{disp}"
+    version: sh1
+    pattern: "1011dddddddddddd"
+    fields: { d: branch_target }
+    scale: 2
+    pc_bias: 4
+    defs: [pr]
+    uses: []
+
+  - name: BrafRn
+    opcode: "braf"
+    args: "{rn}"
+    version: sh2
+    pattern: "0000nnnn00100011"
+    fields: { n: reg }
+    defs: []
+    uses: [rn]
+
+  - name: BsrfRn
+    opcode: "bsrf"
+    args: "{rn}"
+    version: sh2
+    pattern: "0000nnnn00000011"
+    fields: { n: reg }
+    defs: [pr]
+    uses: [rn]
+
+  - name: JmpAtRn
+    opcode: "jmp"
+    args: "@{rn}"
+    version: sh1
+    pattern: "0100nnnn00101011"
+    fields: { n: reg }
+    defs: []
+    uses: [rn]
+
+  - name: JsrAtRn
+    opcode: "jsr"
+    args: "@{rn}"
+    version: sh1
+    pattern: "0100nnnn00001011"
+    fields: { n: reg }
+    defs: [pr]
+    uses: [rn]
+
+  - name: Rts
+    opcode: "rts"
+    args: ""
+    version: sh1
+    pattern: "0000000000001011"
+    fields: {}
+    defs: []
+    uses: [pr]
+
+  - name: Rte
+    opcode: "rte"
+    args: ""
+    version: sh1
+    pattern: "0000000000101011"
+    fields: {}
+    defs: []
+    uses: [ssr, spc]
+
+  # ---------------------------------------------------------------------------
+  # System / Control Registers
+  # ---------------------------------------------------------------------------
+
+  - name: Clrmac
+    opcode: "clrmac"
+    args: ""
+    version: sh1
+    pattern: "0000000000101000"
+    fields: {}
+    defs: [mach, macl]
+    uses: []
+
+  - name: Clrs
+    opcode: "clrs"
+    args: ""
+    version: sh3
+    pattern: "0000000001001000"
+    fields: {}
+    defs: [sr]
+    uses: [sr]
+
+  - name: Clrt
+    opcode: "clrt"
+    args: ""
+    version: sh1
+    pattern: "0000000000001000"
+    fields: {}
+    defs: [t]
+    uses: []
+
+  - name: Sets
+    opcode: "sets"
+    args: ""
+    version: sh3
+    pattern: "0000000001011000"
+    fields: {}
+    defs: [sr]
+    uses: [sr]
+
+  - name: Sett
+    opcode: "sett"
+    args: ""
+    version: sh1
+    pattern: "0000000000011000"
+    fields: {}
+    defs: [t]
+    uses: []
+
+  - name: Nop
+    opcode: "nop"
+    args: ""
+    version: sh1
+    pattern: "0000000000001001"
+    fields: {}
+    defs: []
+    uses: []
+
+  - name: Sleep
+    opcode: "sleep"
+    args: ""
+    version: sh1
+    pattern: "0000000000011011"
+    fields: {}
+    defs: []
+    uses: []
+
+  - name: Ldtlb
+    opcode: "ldtlb"
+    args: ""
+    version: sh3
+    pattern: "0000000000111000"
+    fields: {}
+    defs: []
+    uses: []
+
+  - name: Trapa
+    opcode: "trapa"
+    args: "#{imm}"
+    version: sh1
+    pattern: "11000011iiiiiiii"
+    fields: { i: uimm }
+    defs: []
+    uses: []
+
+  # STC — store control register to Rn
+  - name: StcSrRn
+    opcode: "stc"
+    args: "sr, {rn}"
+    version: sh1
+    pattern: "0000nnnn00000010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [sr]
+
+  - name: StcGbrRn
+    opcode: "stc"
+    args: "gbr, {rn}"
+    version: sh1
+    pattern: "0000nnnn00010010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [gbr]
+
+  - name: StcVbrRn
+    opcode: "stc"
+    args: "vbr, {rn}"
+    version: sh1
+    pattern: "0000nnnn00100010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [vbr]
+
+  - name: StcSsrRn
+    opcode: "stc"
+    args: "ssr, {rn}"
+    version: sh3
+    pattern: "0000nnnn00110010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [ssr]
+
+  - name: StcSpcRn
+    opcode: "stc"
+    args: "spc, {rn}"
+    version: sh3
+    pattern: "0000nnnn01000010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [spc]
+
+  - name: StcDbrRn
+    opcode: "stc"
+    args: "dbr, {rn}"
+    version: sh4
+    pattern: "0000nnnn11111010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [dbr]
+
+  - name: StcSgrRn
+    opcode: "stc"
+    args: "sgr, {rn}"
+    version: sh4
+    pattern: "0000nnnn00111010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [sgr]
+
+  - name: StcBankRn
+    opcode: "stc"
+    args: "r{bank}_bank, {rn}"
+    version: sh3
+    pattern: "0000nnnn1bbb0010"
+    fields: { n: reg, b: bankreg }
+    defs: [rn]
+    uses: []
+
+  - name: StcLoBank5Rn
+    opcode: "stc"
+    args: "r5_bank, {rn}"
+    version: sh3
+    pattern: "0000nnnn01010010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: []
+
+  - name: StcLoBank6Rn
+    opcode: "stc"
+    args: "r6_bank, {rn}"
+    version: sh3
+    pattern: "0000nnnn01100010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: []
+
+  - name: StcLoBank7Rn
+    opcode: "stc"
+    args: "r7_bank, {rn}"
+    version: sh3
+    pattern: "0000nnnn01110010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: []
+
+  # STC.L — store control register to @-Rn
+  - name: StclSrAtDecRn
+    opcode: "stc.l"
+    args: "sr, @-{rn}"
+    version: sh1
+    pattern: "0100nnnn00000011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, sr]
+
+  - name: StclGbrAtDecRn
+    opcode: "stc.l"
+    args: "gbr, @-{rn}"
+    version: sh1
+    pattern: "0100nnnn00010011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, gbr]
+
+  - name: StclVbrAtDecRn
+    opcode: "stc.l"
+    args: "vbr, @-{rn}"
+    version: sh1
+    pattern: "0100nnnn00100011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, vbr]
+
+  - name: StclSsrAtDecRn
+    opcode: "stc.l"
+    args: "ssr, @-{rn}"
+    version: sh3
+    pattern: "0100nnnn00110011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, ssr]
+
+  - name: StclSpcAtDecRn
+    opcode: "stc.l"
+    args: "spc, @-{rn}"
+    version: sh3
+    pattern: "0100nnnn01000011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, spc]
+
+  - name: StclDbrAtDecRn
+    opcode: "stc.l"
+    args: "dbr, @-{rn}"
+    version: sh4
+    pattern: "0100nnnn11110010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, dbr]
+
+  - name: StclSgrAtDecRn
+    opcode: "stc.l"
+    args: "sgr, @-{rn}"
+    version: sh4
+    pattern: "0100nnnn00110010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, sgr]
+
+  - name: StclBankAtDecRn
+    opcode: "stc.l"
+    args: "r{bank}_bank, @-{rn}"
+    version: sh3
+    pattern: "0100nnnn1bbb0011"
+    fields: { n: reg, b: bankreg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: StclLoBank5AtDecRn
+    opcode: "stc.l"
+    args: "r5_bank, @-{rn}"
+    version: sh3
+    pattern: "0100nnnn01010011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: StclLoBank6AtDecRn
+    opcode: "stc.l"
+    args: "r6_bank, @-{rn}"
+    version: sh3
+    pattern: "0100nnnn01100011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  - name: StclLoBank7AtDecRn
+    opcode: "stc.l"
+    args: "r7_bank, @-{rn}"
+    version: sh3
+    pattern: "0100nnnn01110011"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn]
+
+  # LDC — load control register from Rm
+  - name: LdcRmSr
+    opcode: "ldc"
+    args: "{rm}, sr"
+    version: sh1
+    pattern: "0100mmmm00001110"
+    fields: { m: reg }
+    defs: [sr]
+    uses: [rm]
+
+  - name: LdcRmGbr
+    opcode: "ldc"
+    args: "{rm}, gbr"
+    version: sh1
+    pattern: "0100mmmm00011110"
+    fields: { m: reg }
+    defs: [gbr]
+    uses: [rm]
+
+  - name: LdcRmVbr
+    opcode: "ldc"
+    args: "{rm}, vbr"
+    version: sh1
+    pattern: "0100mmmm00101110"
+    fields: { m: reg }
+    defs: [vbr]
+    uses: [rm]
+
+  - name: LdcRmSsr
+    opcode: "ldc"
+    args: "{rm}, ssr"
+    version: sh3
+    pattern: "0100mmmm00111110"
+    fields: { m: reg }
+    defs: [ssr]
+    uses: [rm]
+
+  - name: LdcRmSpc
+    opcode: "ldc"
+    args: "{rm}, spc"
+    version: sh3
+    pattern: "0100mmmm01001110"
+    fields: { m: reg }
+    defs: [spc]
+    uses: [rm]
+
+  - name: LdcRmDbr
+    opcode: "ldc"
+    args: "{rm}, dbr"
+    version: sh4
+    pattern: "0100mmmm11111010"
+    fields: { m: reg }
+    defs: [dbr]
+    uses: [rm]
+
+  - name: LdcRmSgr
+    opcode: "ldc"
+    args: "{rm}, sgr"
+    version: sh4
+    pattern: "0100mmmm00111010"
+    fields: { m: reg }
+    defs: [sgr]
+    uses: [rm]
+
+  - name: LdcRmBank
+    opcode: "ldc"
+    args: "{rm}, r{bank}_bank"
+    version: sh3
+    pattern: "0100mmmm1bbb1110"
+    fields: { m: reg, b: bankreg }
+    defs: []
+    uses: [rm]
+
+  - name: LdcRmLoBank5
+    opcode: "ldc"
+    args: "{rm}, r5_bank"
+    version: sh3
+    pattern: "0100mmmm01011110"
+    fields: { m: reg }
+    defs: []
+    uses: [rm]
+
+  - name: LdcRmLoBank6
+    opcode: "ldc"
+    args: "{rm}, r6_bank"
+    version: sh3
+    pattern: "0100mmmm01101110"
+    fields: { m: reg }
+    defs: []
+    uses: [rm]
+
+  - name: LdcRmLoBank7
+    opcode: "ldc"
+    args: "{rm}, r7_bank"
+    version: sh3
+    pattern: "0100mmmm01111110"
+    fields: { m: reg }
+    defs: []
+    uses: [rm]
+
+  # LDC.L — load control register from @Rm+
+  - name: LdclAtRmIncSr
+    opcode: "ldc.l"
+    args: "@{rm}+, sr"
+    version: sh1
+    pattern: "0100mmmm00000111"
+    fields: { m: reg }
+    defs: [rm, sr]
+    uses: [rm]
+
+  - name: LdclAtRmIncGbr
+    opcode: "ldc.l"
+    args: "@{rm}+, gbr"
+    version: sh1
+    pattern: "0100mmmm00010111"
+    fields: { m: reg }
+    defs: [rm, gbr]
+    uses: [rm]
+
+  - name: LdclAtRmIncVbr
+    opcode: "ldc.l"
+    args: "@{rm}+, vbr"
+    version: sh1
+    pattern: "0100mmmm00100111"
+    fields: { m: reg }
+    defs: [rm, vbr]
+    uses: [rm]
+
+  - name: LdclAtRmIncSsr
+    opcode: "ldc.l"
+    args: "@{rm}+, ssr"
+    version: sh3
+    pattern: "0100mmmm00110111"
+    fields: { m: reg }
+    defs: [rm, ssr]
+    uses: [rm]
+
+  - name: LdclAtRmIncSpc
+    opcode: "ldc.l"
+    args: "@{rm}+, spc"
+    version: sh3
+    pattern: "0100mmmm01000111"
+    fields: { m: reg }
+    defs: [rm, spc]
+    uses: [rm]
+
+  - name: LdclAtRmIncDbr
+    opcode: "ldc.l"
+    args: "@{rm}+, dbr"
+    version: sh4
+    pattern: "0100mmmm11110110"
+    fields: { m: reg }
+    defs: [rm, dbr]
+    uses: [rm]
+
+  - name: LdclAtRmIncSgr
+    opcode: "ldc.l"
+    args: "@{rm}+, sgr"
+    version: sh4
+    pattern: "0100mmmm00110110"
+    fields: { m: reg }
+    defs: [rm, sgr]
+    uses: [rm]
+
+  - name: LdclAtRmIncBank
+    opcode: "ldc.l"
+    args: "@{rm}+, r{bank}_bank"
+    version: sh3
+    pattern: "0100mmmm1bbb0111"
+    fields: { m: reg, b: bankreg }
+    defs: [rm]
+    uses: [rm]
+
+  - name: LdclAtRmIncLoBank5
+    opcode: "ldc.l"
+    args: "@{rm}+, r5_bank"
+    version: sh3
+    pattern: "0100mmmm01010111"
+    fields: { m: reg }
+    defs: [rm]
+    uses: [rm]
+
+  - name: LdclAtRmIncLoBank6
+    opcode: "ldc.l"
+    args: "@{rm}+, r6_bank"
+    version: sh3
+    pattern: "0100mmmm01100111"
+    fields: { m: reg }
+    defs: [rm]
+    uses: [rm]
+
+  - name: LdclAtRmIncLoBank7
+    opcode: "ldc.l"
+    args: "@{rm}+, r7_bank"
+    version: sh3
+    pattern: "0100mmmm01110111"
+    fields: { m: reg }
+    defs: [rm]
+    uses: [rm]
+
+  # STS — store system register to Rn
+  - name: StsMachRn
+    opcode: "sts"
+    args: "mach, {rn}"
+    version: sh1
+    pattern: "0000nnnn00001010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [mach]
+
+  - name: StsMaclRn
+    opcode: "sts"
+    args: "macl, {rn}"
+    version: sh1
+    pattern: "0000nnnn00011010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [macl]
+
+  - name: StsPrRn
+    opcode: "sts"
+    args: "pr, {rn}"
+    version: sh1
+    pattern: "0000nnnn00101010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [pr]
+
+  - name: StsFpscrRn
+    opcode: "sts"
+    args: "fpscr, {rn}"
+    version: sh4
+    pattern: "0000nnnn01101010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [fpscr]
+
+  - name: StsFpulRn
+    opcode: "sts"
+    args: "fpul, {rn}"
+    version: sh4
+    pattern: "0000nnnn01011010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [fpul]
+
+  # STS.L — store system register to @-Rn
+  - name: StslMachAtDecRn
+    opcode: "sts.l"
+    args: "mach, @-{rn}"
+    version: sh1
+    pattern: "0100nnnn00000010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, mach]
+
+  - name: StslMaclAtDecRn
+    opcode: "sts.l"
+    args: "macl, @-{rn}"
+    version: sh1
+    pattern: "0100nnnn00010010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, macl]
+
+  - name: StslPrAtDecRn
+    opcode: "sts.l"
+    args: "pr, @-{rn}"
+    version: sh1
+    pattern: "0100nnnn00100010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, pr]
+
+  - name: StslFpscrAtDecRn
+    opcode: "sts.l"
+    args: "fpscr, @-{rn}"
+    version: sh4
+    pattern: "0100nnnn01100010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, fpscr]
+
+  - name: StslFpulAtDecRn
+    opcode: "sts.l"
+    args: "fpul, @-{rn}"
+    version: sh4
+    pattern: "0100nnnn01010010"
+    fields: { n: reg }
+    defs: [rn]
+    uses: [rn, fpul]
+
+  # LDS — load system register from Rm
+  - name: LdsRmMach
+    opcode: "lds"
+    args: "{rm}, mach"
+    version: sh1
+    pattern: "0100mmmm00001010"
+    fields: { m: reg }
+    defs: [mach]
+    uses: [rm]
+
+  - name: LdsRmMacl
+    opcode: "lds"
+    args: "{rm}, macl"
+    version: sh1
+    pattern: "0100mmmm00011010"
+    fields: { m: reg }
+    defs: [macl]
+    uses: [rm]
+
+  - name: LdsRmPr
+    opcode: "lds"
+    args: "{rm}, pr"
+    version: sh1
+    pattern: "0100mmmm00101010"
+    fields: { m: reg }
+    defs: [pr]
+    uses: [rm]
+
+  - name: LdsRmFpscr
+    opcode: "lds"
+    args: "{rm}, fpscr"
+    version: sh4
+    pattern: "0100mmmm01101010"
+    fields: { m: reg }
+    defs: [fpscr]
+    uses: [rm]
+
+  - name: LdsRmFpul
+    opcode: "lds"
+    args: "{rm}, fpul"
+    version: sh4
+    pattern: "0100mmmm01011010"
+    fields: { m: reg }
+    defs: [fpul]
+    uses: [rm]
+
+  # LDS.L — load system register from @Rm+
+  - name: LdslAtRmIncMach
+    opcode: "lds.l"
+    args: "@{rm}+, mach"
+    version: sh1
+    pattern: "0100mmmm00000110"
+    fields: { m: reg }
+    defs: [rm, mach]
+    uses: [rm]
+
+  - name: LdslAtRmIncMacl
+    opcode: "lds.l"
+    args: "@{rm}+, macl"
+    version: sh1
+    pattern: "0100mmmm00010110"
+    fields: { m: reg }
+    defs: [rm, macl]
+    uses: [rm]
+
+  - name: LdslAtRmIncPr
+    opcode: "lds.l"
+    args: "@{rm}+, pr"
+    version: sh1
+    pattern: "0100mmmm00100110"
+    fields: { m: reg }
+    defs: [rm, pr]
+    uses: [rm]
+
+  - name: LdslAtRmIncFpscr
+    opcode: "lds.l"
+    args: "@{rm}+, fpscr"
+    version: sh4
+    pattern: "0100mmmm01100110"
+    fields: { m: reg }
+    defs: [rm, fpscr]
+    uses: [rm]
+
+  - name: LdslAtRmIncFpul
+    opcode: "lds.l"
+    args: "@{rm}+, fpul"
+    version: sh4
+    pattern: "0100mmmm01010110"
+    fields: { m: reg }
+    defs: [rm, fpul]
+    uses: [rm]
+
+  # Cache / prefetch (SH3/SH4)
+  - name: PrefAtRn
+    opcode: "pref"
+    args: "@{rn}"
+    version: sh3
+    pattern: "0000nnnn10000011"
+    fields: { n: reg }
+    defs: []
+    uses: [rn]
+
+  - name: OcbiAtRn
+    opcode: "ocbi"
+    args: "@{rn}"
+    version: sh4
+    pattern: "0000nnnn10010011"
+    fields: { n: reg }
+    defs: []
+    uses: [rn]
+
+  - name: OcbpAtRn
+    opcode: "ocbp"
+    args: "@{rn}"
+    version: sh4
+    pattern: "0000nnnn10100011"
+    fields: { n: reg }
+    defs: []
+    uses: [rn]
+
+  - name: OcbwbAtRn
+    opcode: "ocbwb"
+    args: "@{rn}"
+    version: sh4
+    pattern: "0000nnnn10110011"
+    fields: { n: reg }
+    defs: []
+    uses: [rn]
+
+  # ---------------------------------------------------------------------------
+  # SH4 Floating-Point Instructions
+  # ---------------------------------------------------------------------------
+
+  - name: FaddFrmFrn
+    opcode: "fadd"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0000"
+    fields: { n: freg, m: freg }
+    defs: [frn]
+    uses: [frm, frn, fpscr]
+
+  - name: FsubFrmFrn
+    opcode: "fsub"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0001"
+    fields: { n: freg, m: freg }
+    defs: [frn]
+    uses: [frm, frn, fpscr]
+
+  - name: FmulFrmFrn
+    opcode: "fmul"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0010"
+    fields: { n: freg, m: freg }
+    defs: [frn]
+    uses: [frm, frn, fpscr]
+
+  - name: FdivFrmFrn
+    opcode: "fdiv"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0011"
+    fields: { n: freg, m: freg }
+    defs: [frn]
+    uses: [frm, frn, fpscr]
+
+  - name: FcmpeqFrmFrn
+    opcode: "fcmp/eq"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0100"
+    fields: { n: freg, m: freg }
+    defs: [t]
+    uses: [frm, frn, fpscr]
+
+  - name: FcmpgtFrmFrn
+    opcode: "fcmp/gt"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0101"
+    fields: { n: freg, m: freg }
+    defs: [t]
+    uses: [frm, frn, fpscr]
+
+  # FMOV — single-precision variants
+  - name: FmovAtR0RmFrn
+    opcode: "fmov"
+    args: "@(r0, {rm}), {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm0110"
+    fields: { n: freg, m: reg }
+    defs: [frn]
+    uses: [r0, rm, fpscr]
+
+  - name: FmovFrmAtR0Rn
+    opcode: "fmov"
+    args: "{frm}, @(r0, {rn})"
+    version: sh4
+    pattern: "1111nnnnmmmm0111"
+    fields: { n: reg, m: freg }
+    defs: []
+    uses: [r0, frm, rn, fpscr]
+
+  - name: FmovAtRmFrn
+    opcode: "fmov"
+    args: "@{rm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm1000"
+    fields: { n: freg, m: reg }
+    defs: [frn]
+    uses: [rm, fpscr]
+
+  - name: FmovAtRmIncFrn
+    opcode: "fmov"
+    args: "@{rm}+, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm1001"
+    fields: { n: freg, m: reg }
+    defs: [frn, rm]
+    uses: [rm, fpscr]
+
+  - name: FmovFrmAtRn
+    opcode: "fmov"
+    args: "{frm}, @{rn}"
+    version: sh4
+    pattern: "1111nnnnmmmm1010"
+    fields: { n: reg, m: freg }
+    defs: []
+    uses: [frm, rn, fpscr]
+
+  - name: FmovFrmAtDecRn
+    opcode: "fmov"
+    args: "{frm}, @-{rn}"
+    version: sh4
+    pattern: "1111nnnnmmmm1011"
+    fields: { n: reg, m: freg }
+    defs: [rn]
+    uses: [frm, rn, fpscr]
+
+  - name: FmovFrmFrn
+    opcode: "fmov"
+    args: "{frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm1100"
+    fields: { n: freg, m: freg }
+    defs: [frn]
+    uses: [frm, fpscr]
+
+  # FSTS / FLDS — move between FR and FPUL
+  - name: FstsFpulFrn
+    opcode: "fsts"
+    args: "fpul, {frn}"
+    version: sh4
+    pattern: "1111nnnn00001101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [fpul]
+
+  - name: FldsFrnFpul
+    opcode: "flds"
+    args: "{frn}, fpul"
+    version: sh4
+    pattern: "1111nnnn00011101"
+    fields: { n: freg }
+    defs: [fpul]
+    uses: [frn]
+
+  # FLOAT / FTRC — int↔float conversion
+  - name: FloatFpulFrn
+    opcode: "float"
+    args: "fpul, {frn}"
+    version: sh4
+    pattern: "1111nnnn00101101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [fpul, fpscr]
+
+  - name: FtrcFrnFpul
+    opcode: "ftrc"
+    args: "{frn}, fpul"
+    version: sh4
+    pattern: "1111nnnn00111101"
+    fields: { n: freg }
+    defs: [fpul]
+    uses: [frn, fpscr]
+
+  # FNEG / FABS / FSQRT
+  - name: FnegFrn
+    opcode: "fneg"
+    args: "{frn}"
+    version: sh4
+    pattern: "1111nnnn01001101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [frn, fpscr]
+
+  - name: FabsFrn
+    opcode: "fabs"
+    args: "{frn}"
+    version: sh4
+    pattern: "1111nnnn01011101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [frn, fpscr]
+
+  - name: FsqrtFrn
+    opcode: "fsqrt"
+    args: "{frn}"
+    version: sh4
+    pattern: "1111nnnn01101101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [frn, fpscr]
+
+  # FLDI0 / FLDI1
+  - name: Fldi0Frn
+    opcode: "fldi0"
+    args: "{frn}"
+    version: sh4
+    pattern: "1111nnnn10001101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [fpscr]
+
+  - name: Fldi1Frn
+    opcode: "fldi1"
+    args: "{frn}"
+    version: sh4
+    pattern: "1111nnnn10011101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [fpscr]
+
+  # FMAC — fused multiply-accumulate
+  - name: FmacFr0FrmFrn
+    opcode: "fmac"
+    args: "fr0, {frm}, {frn}"
+    version: sh4
+    pattern: "1111nnnnmmmm1110"
+    fields: { n: freg, m: freg }
+    defs: [frn]
+    uses: [fr0, frm, frn, fpscr]
+
+  # FCNVSD / FCNVDS — single↔double conversion
+  - name: FcnvsdFpulDrn
+    opcode: "fcnvsd"
+    args: "fpul, {drn}"
+    version: sh4
+    pattern: "1111nnn010101101"
+    fields: { n: dreg }
+    defs: [drn]
+    uses: [fpul, fpscr]
+
+  - name: FcnvdsDrnFpul
+    opcode: "fcnvds"
+    args: "{drn}, fpul"
+    version: sh4
+    pattern: "1111nnn010111101"
+    fields: { n: dreg }
+    defs: [fpul]
+    uses: [drn, fpscr]
+
+  # FIPR — inner product of two 4-component vectors
+  - name: FiprFvmFvn
+    opcode: "fipr"
+    args: "{fvm}, {fvn}"
+    version: sh4
+    pattern: "1111nnmm11101101"
+    fields: { n: vecreg, m: vecreg }
+    defs: [fvn]
+    uses: [fvm, fvn, fpscr]
+
+  # FTRV — matrix-vector multiply
+  - name: FtrvXmtrxFvn
+    opcode: "ftrv"
+    args: "xmtrx, {fvn}"
+    version: sh4
+    pattern: "1111nn0111111101"
+    fields: { n: vecreg }
+    defs: [fvn]
+    uses: [fvn, fpscr]
+
+  # FSRRA — reciprocal square root approximation (single-precision)
+  - name: FsrraFrn
+    opcode: "fsrra"
+    args: "{frn}"
+    version: sh4
+    pattern: "1111nnnn01111101"
+    fields: { n: freg }
+    defs: [frn]
+    uses: [frn, fpscr]
+
+  # FSCA — sin/cos approximation; result pair stored in DRn (FRn=sin, FRn+1=cos)
+  # bit 8 is fixed 0 — the 3-bit DR index occupies bits [11:9]
+  - name: FscaFpulDrn
+    opcode: "fsca"
+    args: "fpul, {drn}"
+    version: sh4
+    pattern: "1111nnn011111101"
+    fields: { n: dreg }
+    defs: [drn]
+    uses: [fpul, fpscr]
+
+  # FSCHG / FRCHG — toggle FPSCR bits
+  - name: Fschg
+    opcode: "fschg"
+    args: ""
+    version: sh4
+    pattern: "1111001111111101"
+    fields: {}
+    defs: [fpscr]
+    uses: [fpscr]
+
+  - name: Frchg
+    opcode: "frchg"
+    args: ""
+    version: sh4
+    pattern: "1111101111111101"
+    fields: {}
+    defs: [fpscr]
+    uses: [fpscr]
