@@ -78,8 +78,11 @@ fn gen_arm(op: &Opcode, is_defs: bool) -> TokenStream {
             pushes.push(field_push_expr(&ident, ft));
         } else if let Some(expr) = literal_reg_expr(r) {
             pushes.push(expr);
+        } else {
+            // Isa::validate() rejects unknown names before generation, so this is
+            // unreachable unless the two name tables drift apart.
+            panic!("opcode '{}': unrecognised register '{}' in defs/uses", op.name, r);
         }
-        // unrecognised names (e.g. "sgr", "fpul") are silently skipped
     }
 
     if pushes.is_empty() {

@@ -1,10 +1,11 @@
 [package]
 name = "superh"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["christianttt"]
 edition = "2024"
 description = "Disassembler for the SuperH (SH) instruction set (SH1/2/3/4)"
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/christianttt/superh"
 categories = ["no-std", "parser-implementations"]
 keywords = ["disassembler", "superh", "sh4", "sega", "dreamcast"]

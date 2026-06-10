@@ -45,6 +45,7 @@ fn write_generated(path: impl AsRef<Path>, tokens: proc_macro2::TokenStream) -> 
         "    clippy::match_same_arms,\n",
         "    clippy::uninlined_format_args,\n",
         "    clippy::doc_markdown,\n",
+        "    clippy::collapsible_match,\n",
         ")]\n\n"
     );
     fs::write(path, format!("{header}{code}"))

@@ -14,6 +14,7 @@
     clippy::match_same_arms,
     clippy::uninlined_format_args,
     clippy::doc_markdown,
+    clippy::collapsible_match,
 )]
 
 use crate::{BranchTarget, Ins, Options, Reg, Versions, Version};
@@ -32,373 +33,470 @@ fn disp8_signed(ins: u16) -> i32 {
 fn parse_group0(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xffff) == 0x19 {
-        return Ins::Div0u;
-    }
-    if (ins & 0xffff) == 0xb {
-        return Ins::Rts;
-    }
-    if (ins & 0xffff) == 0x2b {
-        return Ins::Rte;
-    }
-    if (ins & 0xffff) == 0x28 {
-        return Ins::Clrmac;
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xffff) == 0x48 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+    match ins & 0xf {
+        0x2 => {
+            if (ins & 0xf0ff) == 0x2 {
+                return Ins::StcSrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x12 {
+                return Ins::StcGbrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x22 {
+                return Ins::StcVbrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x32 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcSsrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x42 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcSpcRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x52 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcLoBank5Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x62 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcLoBank6Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x72 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcLoBank7Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf08f) == 0x82 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcBankRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    bank: ((ins >> 4u8) & 7u16) as u8,
+                };
+            }
         }
-        return Ins::Clrs;
-    }
-    if (ins & 0xffff) == 0x8 {
-        return Ins::Clrt;
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xffff) == 0x58 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x3 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xc3 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::MovcalR0AtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf0ff) == 0x23 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::BrafRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf0ff) == 0x3 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::BsrfRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x83 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::PrefAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x93 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::OcbiAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xa3 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::OcbpAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xb3 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::OcbwbAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::Sets;
-    }
-    if (ins & 0xffff) == 0x18 {
-        return Ins::Sett;
-    }
-    if (ins & 0xffff) == 0x9 {
-        return Ins::Nop;
-    }
-    if (ins & 0xffff) == 0x1b {
-        return Ins::Sleep;
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xffff) == 0x38 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x4 => {
+            if (ins & 0xf00f) == 0x4 {
+                return Ins::MovbRmAtR0Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::Ldtlb;
-    }
-    if (ins & 0xf0ff) == 0x29 {
-        return Ins::Movt {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xc3 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x5 => {
+            if (ins & 0xf00f) == 0x5 {
+                return Ins::MovwRmAtR0Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::MovcalR0AtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf0ff) == 0x23 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x6 => {
+            if (ins & 0xf00f) == 0x6 {
+                return Ins::MovlRmAtR0Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::BrafRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf0ff) == 0x3 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x7 => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf00f) == 0x7 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::MullRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::BsrfRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x2 {
-        return Ins::StcSrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x12 {
-        return Ins::StcGbrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x22 {
-        return Ins::StcVbrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x32 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x8 => {
+            if (ins & 0xffff) == 0x28 {
+                return Ins::Clrmac;
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xffff) == 0x48 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Clrs;
+            }
+            if (ins & 0xffff) == 0x8 {
+                return Ins::Clrt;
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xffff) == 0x58 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Sets;
+            }
+            if (ins & 0xffff) == 0x18 {
+                return Ins::Sett;
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xffff) == 0x38 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Ldtlb;
+            }
         }
-        return Ins::StcSsrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x42 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x9 => {
+            if (ins & 0xffff) == 0x19 {
+                return Ins::Div0u;
+            }
+            if (ins & 0xffff) == 0x9 {
+                return Ins::Nop;
+            }
+            if (ins & 0xf0ff) == 0x29 {
+                return Ins::Movt {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StcSpcRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xfa {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xa => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xfa {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcDbrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x3a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StcSgrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0xa {
+                return Ins::StsMachRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x1a {
+                return Ins::StsMaclRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x2a {
+                return Ins::StsPrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x6a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StsFpscrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x5a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StsFpulRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StcDbrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x3a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xb => {
+            if (ins & 0xffff) == 0xb {
+                return Ins::Rts;
+            }
+            if (ins & 0xffff) == 0x2b {
+                return Ins::Rte;
+            }
+            if (ins & 0xffff) == 0x1b {
+                return Ins::Sleep;
+            }
         }
-        return Ins::StcSgrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x52 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xc => {
+            if (ins & 0xf00f) == 0xc {
+                return Ins::MovbAtR0RmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StcLoBank5Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x62 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xd => {
+            if (ins & 0xf00f) == 0xd {
+                return Ins::MovwAtR0RmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StcLoBank6Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x72 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xe => {
+            if (ins & 0xf00f) == 0xe {
+                return Ins::MovlAtR0RmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StcLoBank7Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0xa {
-        return Ins::StsMachRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x1a {
-        return Ins::StsMaclRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x2a {
-        return Ins::StsPrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x6a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xf => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf00f) == 0xf {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::MaclAtRmIncAtRnInc {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StsFpscrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x5a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::StsFpulRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x83 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::PrefAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x93 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::OcbiAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xa3 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::OcbpAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xb3 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::OcbwbAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf08f) == 0x82 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::StcBankRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            bank: ((ins >> 4u8) & 7u16) as u8,
-        };
-    }
-    if (ins & 0xf00f) == 0x4 {
-        return Ins::MovbRmAtR0Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x5 {
-        return Ins::MovwRmAtR0Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6 {
-        return Ins::MovlRmAtR0Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0xc {
-        return Ins::MovbAtR0RmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0xd {
-        return Ins::MovwAtR0RmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0xe {
-        return Ins::MovlAtR0RmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf00f) == 0xf {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::MaclAtRmIncAtRnInc {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf00f) == 0x7 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::MullRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -419,95 +517,128 @@ fn parse_group1(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_group2(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xf00f) == 0x2000 {
-        return Ins::MovbRmAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2001 {
-        return Ins::MovwRmAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2002 {
-        return Ins::MovlRmAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2004 {
-        return Ins::MovbRmAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2005 {
-        return Ins::MovwRmAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2006 {
-        return Ins::MovlRmAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x200d {
-        return Ins::XtrctRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x200c {
-        return Ins::CmpstrRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2007 {
-        return Ins::Div0sRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x200f {
-        return Ins::MulswRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x200e {
-        return Ins::MuluwRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2009 {
-        return Ins::AndRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x200b {
-        return Ins::OrRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x2008 {
-        return Ins::TstRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x200a {
-        return Ins::XorRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
+    match ins & 0xf {
+        0x0 => {
+            if (ins & 0xf00f) == 0x2000 {
+                return Ins::MovbRmAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x1 => {
+            if (ins & 0xf00f) == 0x2001 {
+                return Ins::MovwRmAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x2 => {
+            if (ins & 0xf00f) == 0x2002 {
+                return Ins::MovlRmAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x4 => {
+            if (ins & 0xf00f) == 0x2004 {
+                return Ins::MovbRmAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x5 => {
+            if (ins & 0xf00f) == 0x2005 {
+                return Ins::MovwRmAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x6 => {
+            if (ins & 0xf00f) == 0x2006 {
+                return Ins::MovlRmAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x7 => {
+            if (ins & 0xf00f) == 0x2007 {
+                return Ins::Div0sRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x8 => {
+            if (ins & 0xf00f) == 0x2008 {
+                return Ins::TstRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x9 => {
+            if (ins & 0xf00f) == 0x2009 {
+                return Ins::AndRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xa => {
+            if (ins & 0xf00f) == 0x200a {
+                return Ins::XorRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xb => {
+            if (ins & 0xf00f) == 0x200b {
+                return Ins::OrRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xc => {
+            if (ins & 0xf00f) == 0x200c {
+                return Ins::CmpstrRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xd => {
+            if (ins & 0xf00f) == 0x200d {
+                return Ins::XtrctRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xe => {
+            if (ins & 0xf00f) == 0x200e {
+                return Ins::MuluwRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xf => {
+            if (ins & 0xf00f) == 0x200f {
+                return Ins::MulswRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -515,117 +646,148 @@ fn parse_group2(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_group3(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xf00f) == 0x300c {
-        return Ins::AddRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x300e {
-        return Ins::AddcRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x300f {
-        return Ins::AddvRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3000 {
-        return Ins::CmpeqRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3003 {
-        return Ins::CmpgeRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3007 {
-        return Ins::CmpgtRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3006 {
-        return Ins::CmphiRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3002 {
-        return Ins::CmphsRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3004 {
-        return Ins::Div1RmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf00f) == 0x300d {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+    match ins & 0xf {
+        0x0 => {
+            if (ins & 0xf00f) == 0x3000 {
+                return Ins::CmpeqRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::DmulslRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf00f) == 0x3005 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x2 => {
+            if (ins & 0xf00f) == 0x3002 {
+                return Ins::CmphsRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::DmuluRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x3008 {
-        return Ins::SubRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x300a {
-        return Ins::SubcRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x300b {
-        return Ins::SubvRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
+        0x3 => {
+            if (ins & 0xf00f) == 0x3003 {
+                return Ins::CmpgeRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x4 => {
+            if (ins & 0xf00f) == 0x3004 {
+                return Ins::Div1RmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x5 => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf00f) == 0x3005 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::DmuluRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x6 => {
+            if (ins & 0xf00f) == 0x3006 {
+                return Ins::CmphiRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x7 => {
+            if (ins & 0xf00f) == 0x3007 {
+                return Ins::CmpgtRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x8 => {
+            if (ins & 0xf00f) == 0x3008 {
+                return Ins::SubRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xa => {
+            if (ins & 0xf00f) == 0x300a {
+                return Ins::SubcRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xb => {
+            if (ins & 0xf00f) == 0x300b {
+                return Ins::SubvRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xc => {
+            if (ins & 0xf00f) == 0x300c {
+                return Ins::AddRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xd => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf00f) == 0x300d {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::DmulslRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xe => {
+            if (ins & 0xf00f) == 0x300e {
+                return Ins::AddcRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xf => {
+            if (ins & 0xf00f) == 0x300f {
+                return Ins::AddvRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -633,580 +795,739 @@ fn parse_group3(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_group4(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xf0ff) == 0x4015 {
-        return Ins::CmpplRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4011 {
-        return Ins::CmppzRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xf0ff) == 0x4010 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+    match ins & 0xf {
+        0x0 => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xf0ff) == 0x4010 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::DtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4020 {
+                return Ins::ShalRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4000 {
+                return Ins::ShllRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::DtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x401b {
-        return Ins::TasbAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4004 {
-        return Ins::RotlRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4005 {
-        return Ins::RotrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4024 {
-        return Ins::RotclRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4025 {
-        return Ins::RotcrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4020 {
-        return Ins::ShalRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4021 {
-        return Ins::SharRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4000 {
-        return Ins::ShllRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4008 {
-        return Ins::Shll2Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4018 {
-        return Ins::Shll8Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4028 {
-        return Ins::Shll16Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4001 {
-        return Ins::ShlrRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4009 {
-        return Ins::Shlr2Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4019 {
-        return Ins::Shlr8Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4029 {
-        return Ins::Shlr16Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x402b {
-        return Ins::JmpAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x400b {
-        return Ins::JsrAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4003 {
-        return Ins::StclSrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4013 {
-        return Ins::StclGbrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4023 {
-        return Ins::StclVbrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4033 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x1 => {
+            if (ins & 0xf0ff) == 0x4011 {
+                return Ins::CmppzRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4021 {
+                return Ins::SharRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4001 {
+                return Ins::ShlrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StclSsrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4043 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x2 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x40f2 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclDbrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x4032 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclSgrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4002 {
+                return Ins::StslMachAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4012 {
+                return Ins::StslMaclAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4022 {
+                return Ins::StslPrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x4062 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StslFpscrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x4052 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StslFpulAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StclSpcAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x40f2 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x3 => {
+            if (ins & 0xf0ff) == 0x4003 {
+                return Ins::StclSrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4013 {
+                return Ins::StclGbrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4023 {
+                return Ins::StclVbrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4033 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclSsrAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4043 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclSpcAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4053 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclLoBank5AtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4063 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclLoBank6AtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4073 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclLoBank7AtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf08f) == 0x4083 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::StclBankAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    bank: ((ins >> 4u8) & 7u16) as u8,
+                };
+            }
         }
-        return Ins::StclDbrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x4032 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x4 => {
+            if (ins & 0xf0ff) == 0x4004 {
+                return Ins::RotlRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4024 {
+                return Ins::RotclRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StclSgrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4053 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x5 => {
+            if (ins & 0xf0ff) == 0x4015 {
+                return Ins::CmpplRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4005 {
+                return Ins::RotrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4025 {
+                return Ins::RotcrRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StclLoBank5AtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4063 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x6 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x40f6 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncDbr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x4036 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncSgr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4006 {
+                return Ins::LdslAtRmIncMach {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4016 {
+                return Ins::LdslAtRmIncMacl {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4026 {
+                return Ins::LdslAtRmIncPr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x4066 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdslAtRmIncFpscr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x4056 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdslAtRmIncFpul {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::StclLoBank6AtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4073 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x7 => {
+            if (ins & 0xf0ff) == 0x4007 {
+                return Ins::LdclAtRmIncSr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4017 {
+                return Ins::LdclAtRmIncGbr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4027 {
+                return Ins::LdclAtRmIncVbr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4037 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncSsr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4047 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncSpc {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4057 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncLoBank5 {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4067 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncLoBank6 {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x4077 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncLoBank7 {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf08f) == 0x4087 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdclAtRmIncBank {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    bank: ((ins >> 4u8) & 7u16) as u8,
+                };
+            }
         }
-        return Ins::StclLoBank7AtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x400e {
-        return Ins::LdcRmSr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x401e {
-        return Ins::LdcRmGbr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x402e {
-        return Ins::LdcRmVbr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x403e {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x8 => {
+            if (ins & 0xf0ff) == 0x4008 {
+                return Ins::Shll2Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4018 {
+                return Ins::Shll8Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4028 {
+                return Ins::Shll16Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdcRmSsr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x404e {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x9 => {
+            if (ins & 0xf0ff) == 0x4009 {
+                return Ins::Shlr2Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4019 {
+                return Ins::Shlr8Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x4029 {
+                return Ins::Shlr16Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdcRmSpc {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x40fa {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xa => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x40fa {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmDbr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x403a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmSgr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x400a {
+                return Ins::LdsRmMach {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x401a {
+                return Ins::LdsRmMacl {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x402a {
+                return Ins::LdsRmPr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x406a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdsRmFpscr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0x405a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdsRmFpul {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdcRmDbr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x403a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xb => {
+            if (ins & 0xf0ff) == 0x401b {
+                return Ins::TasbAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x402b {
+                return Ins::JmpAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x400b {
+                return Ins::JsrAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdcRmSgr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x405e {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xc => {
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf00f) == 0x400c {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::ShadRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdcRmLoBank5 {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x406e {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xd => {
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf00f) == 0x400d {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::ShldRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdcRmLoBank6 {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x407e {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xe => {
+            if (ins & 0xf0ff) == 0x400e {
+                return Ins::LdcRmSr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x401e {
+                return Ins::LdcRmGbr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            if (ins & 0xf0ff) == 0x402e {
+                return Ins::LdcRmVbr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x403e {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmSsr {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x404e {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmSpc {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x405e {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmLoBank5 {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x406e {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmLoBank6 {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf0ff) == 0x407e {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmLoBank7 {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh3")]
+            if (ins & 0xf08f) == 0x408e {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::LdcRmBank {
+                    rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    bank: ((ins >> 4u8) & 7u16) as u8,
+                };
+            }
         }
-        return Ins::LdcRmLoBank7 {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4007 {
-        return Ins::LdclAtRmIncSr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4017 {
-        return Ins::LdclAtRmIncGbr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4027 {
-        return Ins::LdclAtRmIncVbr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4037 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xf => {
+            if (ins & 0xf00f) == 0x400f {
+                return Ins::MacwAtRmIncAtRnInc {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::LdclAtRmIncSsr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4047 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncSpc {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x40f6 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncDbr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x4036 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncSgr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4057 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncLoBank5 {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4067 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncLoBank6 {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf0ff) == 0x4077 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncLoBank7 {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4002 {
-        return Ins::StslMachAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4012 {
-        return Ins::StslMaclAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4022 {
-        return Ins::StslPrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x4062 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::StslFpscrAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x4052 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::StslFpulAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x400a {
-        return Ins::LdsRmMach {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x401a {
-        return Ins::LdsRmMacl {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x402a {
-        return Ins::LdsRmPr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x406a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdsRmFpscr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x405a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdsRmFpul {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4006 {
-        return Ins::LdslAtRmIncMach {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4016 {
-        return Ins::LdslAtRmIncMacl {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf0ff) == 0x4026 {
-        return Ins::LdslAtRmIncPr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x4066 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdslAtRmIncFpscr {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0x4056 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdslAtRmIncFpul {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf08f) == 0x4083 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::StclBankAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            bank: ((ins >> 4u8) & 7u16) as u8,
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf08f) == 0x408e {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdcRmBank {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            bank: ((ins >> 4u8) & 7u16) as u8,
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf08f) == 0x4087 {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::LdclAtRmIncBank {
-            rm: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            bank: ((ins >> 4u8) & 7u16) as u8,
-        };
-    }
-    if (ins & 0xf00f) == 0x400f {
-        return Ins::MacwAtRmIncAtRnInc {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf00f) == 0x400c {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::ShadRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh3")]
-    if (ins & 0xf00f) == 0x400d {
-        const VERSIONS: Versions = Versions::of(
-            &[#[cfg(feature = "sh3")] Version::Sh3, #[cfg(feature = "sh4")] Version::Sh4],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::ShldRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -1227,101 +1548,136 @@ fn parse_group5(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_group6(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xf00f) == 0x6003 {
-        return Ins::MovRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6000 {
-        return Ins::MovbAtRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6001 {
-        return Ins::MovwAtRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6002 {
-        return Ins::MovlAtRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6004 {
-        return Ins::MovbAtRmIncRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6005 {
-        return Ins::MovwAtRmIncRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6006 {
-        return Ins::MovlAtRmIncRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6008 {
-        return Ins::SwapbRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6009 {
-        return Ins::SwapwRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x600e {
-        return Ins::ExtsbRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x600f {
-        return Ins::ExtswRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x600c {
-        return Ins::ExtubRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x600d {
-        return Ins::ExtuwRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x600b {
-        return Ins::NegRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x600a {
-        return Ins::NegcRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    if (ins & 0xf00f) == 0x6007 {
-        return Ins::NotRmRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
+    match ins & 0xf {
+        0x0 => {
+            if (ins & 0xf00f) == 0x6000 {
+                return Ins::MovbAtRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x1 => {
+            if (ins & 0xf00f) == 0x6001 {
+                return Ins::MovwAtRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x2 => {
+            if (ins & 0xf00f) == 0x6002 {
+                return Ins::MovlAtRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x3 => {
+            if (ins & 0xf00f) == 0x6003 {
+                return Ins::MovRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x4 => {
+            if (ins & 0xf00f) == 0x6004 {
+                return Ins::MovbAtRmIncRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x5 => {
+            if (ins & 0xf00f) == 0x6005 {
+                return Ins::MovwAtRmIncRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x6 => {
+            if (ins & 0xf00f) == 0x6006 {
+                return Ins::MovlAtRmIncRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x7 => {
+            if (ins & 0xf00f) == 0x6007 {
+                return Ins::NotRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x8 => {
+            if (ins & 0xf00f) == 0x6008 {
+                return Ins::SwapbRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0x9 => {
+            if (ins & 0xf00f) == 0x6009 {
+                return Ins::SwapwRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xa => {
+            if (ins & 0xf00f) == 0x600a {
+                return Ins::NegcRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xb => {
+            if (ins & 0xf00f) == 0x600b {
+                return Ins::NegRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xc => {
+            if (ins & 0xf00f) == 0x600c {
+                return Ins::ExtubRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xd => {
+            if (ins & 0xf00f) == 0x600d {
+                return Ins::ExtuwRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xe => {
+            if (ins & 0xf00f) == 0x600e {
+                return Ins::ExtsbRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        0xf => {
+            if (ins & 0xf00f) == 0x600f {
+                return Ins::ExtswRmRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
+        }
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -1341,90 +1697,111 @@ fn parse_group7(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_group8(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xff00) == 0x8000 {
-        return Ins::MovbR0AtDispRn {
-            rn: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-            disp: ((ins >> 0u8) & 15u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0x8100 {
-        return Ins::MovwR0AtDispRn {
-            rn: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-            disp: ((ins >> 0u8) & 15u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0x8400 {
-        return Ins::MovbAtDispRmR0 {
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-            disp: ((ins >> 0u8) & 15u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0x8500 {
-        return Ins::MovwAtDispRmR0 {
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-            disp: ((ins >> 0u8) & 15u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0x8800 {
-        return Ins::CmpeqImmR0 {
-            imm: ((ins >> 0u8) & 255u16) as u8 as i8,
-        };
-    }
-    if (ins & 0xff00) == 0x8900 {
-        return Ins::Bt {
-            disp: BranchTarget {
-                addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
-            },
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xff00) == 0x8d00 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+    match ins & 0xf00 {
+        0x0 => {
+            if (ins & 0xff00) == 0x8000 {
+                return Ins::MovbR0AtDispRn {
+                    rn: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                    disp: ((ins >> 0u8) & 15u16) as u8,
+                };
+            }
         }
-        return Ins::Bts {
-            disp: BranchTarget {
-                addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
-            },
-        };
-    }
-    if (ins & 0xff00) == 0x8b00 {
-        return Ins::Bf {
-            disp: BranchTarget {
-                addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
-            },
-        };
-    }
-    #[cfg(feature = "sh2")]
-    if (ins & 0xff00) == 0x8f00 {
-        const VERSIONS: Versions = Versions::of(
-            &[
-                #[cfg(feature = "sh2")]
-                Version::Sh2,
-                #[cfg(feature = "sh3")]
-                Version::Sh3,
-                #[cfg(feature = "sh4")]
-                Version::Sh4,
-            ],
-        );
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x100 => {
+            if (ins & 0xff00) == 0x8100 {
+                return Ins::MovwR0AtDispRn {
+                    rn: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                    disp: ((ins >> 0u8) & 15u16) as u8,
+                };
+            }
         }
-        return Ins::Bfs {
-            disp: BranchTarget {
-                addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
-            },
-        };
+        0x400 => {
+            if (ins & 0xff00) == 0x8400 {
+                return Ins::MovbAtDispRmR0 {
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                    disp: ((ins >> 0u8) & 15u16) as u8,
+                };
+            }
+        }
+        0x500 => {
+            if (ins & 0xff00) == 0x8500 {
+                return Ins::MovwAtDispRmR0 {
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                    disp: ((ins >> 0u8) & 15u16) as u8,
+                };
+            }
+        }
+        0x800 => {
+            if (ins & 0xff00) == 0x8800 {
+                return Ins::CmpeqImmR0 {
+                    imm: ((ins >> 0u8) & 255u16) as u8 as i8,
+                };
+            }
+        }
+        0x900 => {
+            if (ins & 0xff00) == 0x8900 {
+                return Ins::Bt {
+                    disp: BranchTarget {
+                        addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
+                    },
+                };
+            }
+        }
+        0xb00 => {
+            if (ins & 0xff00) == 0x8b00 {
+                return Ins::Bf {
+                    disp: BranchTarget {
+                        addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
+                    },
+                };
+            }
+        }
+        0xd00 => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xff00) == 0x8d00 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Bts {
+                    disp: BranchTarget {
+                        addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
+                    },
+                };
+            }
+        }
+        0xf00 => {
+            #[cfg(feature = "sh2")]
+            if (ins & 0xff00) == 0x8f00 {
+                const VERSIONS: Versions = Versions::of(
+                    &[
+                        #[cfg(feature = "sh2")]
+                        Version::Sh2,
+                        #[cfg(feature = "sh3")]
+                        Version::Sh3,
+                        #[cfg(feature = "sh4")]
+                        Version::Sh4,
+                    ],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Bfs {
+                    disp: BranchTarget {
+                        addr: (pc as i32 + disp8_signed(ins) * 2i32 + 4i32) as u32,
+                    },
+                };
+            }
+        }
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -1470,85 +1847,120 @@ fn parse_groupb(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_groupc(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    if (ins & 0xff00) == 0xc000 {
-        return Ins::MovbR0AtDispGbr {
-            disp: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc100 {
-        return Ins::MovwR0AtDispGbr {
-            disp: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc200 {
-        return Ins::MovlR0AtDispGbr {
-            disp: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc400 {
-        return Ins::MovbAtDispGbrR0 {
-            disp: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc500 {
-        return Ins::MovwAtDispGbrR0 {
-            disp: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc600 {
-        return Ins::MovlAtDispGbrR0 {
-            disp: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc700 {
-        return Ins::Mova {
-            disp: ((ins >> 0u8) & 255u16) as u32 * 4u32 + 4u32 - (pc & 3u32),
-        };
-    }
-    if (ins & 0xff00) == 0xc900 {
-        return Ins::AndImmR0 {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xcd00 {
-        return Ins::AndbImmAtR0Gbr {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xcb00 {
-        return Ins::OrImmR0 {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xcf00 {
-        return Ins::OrbImmAtR0Gbr {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc800 {
-        return Ins::TstImmR0 {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xcc00 {
-        return Ins::TstbImmAtR0Gbr {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xca00 {
-        return Ins::XorImmR0 {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xce00 {
-        return Ins::XorbImmAtR0Gbr {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
-    }
-    if (ins & 0xff00) == 0xc300 {
-        return Ins::Trapa {
-            imm: ((ins >> 0u8) & 255u16) as u8,
-        };
+    match ins & 0xf00 {
+        0x0 => {
+            if (ins & 0xff00) == 0xc000 {
+                return Ins::MovbR0AtDispGbr {
+                    disp: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x100 => {
+            if (ins & 0xff00) == 0xc100 {
+                return Ins::MovwR0AtDispGbr {
+                    disp: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x200 => {
+            if (ins & 0xff00) == 0xc200 {
+                return Ins::MovlR0AtDispGbr {
+                    disp: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x300 => {
+            if (ins & 0xff00) == 0xc300 {
+                return Ins::Trapa {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x400 => {
+            if (ins & 0xff00) == 0xc400 {
+                return Ins::MovbAtDispGbrR0 {
+                    disp: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x500 => {
+            if (ins & 0xff00) == 0xc500 {
+                return Ins::MovwAtDispGbrR0 {
+                    disp: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x600 => {
+            if (ins & 0xff00) == 0xc600 {
+                return Ins::MovlAtDispGbrR0 {
+                    disp: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x700 => {
+            if (ins & 0xff00) == 0xc700 {
+                return Ins::Mova {
+                    disp: ((ins >> 0u8) & 255u16) as u32 * 4u32 + 4u32 - (pc & 3u32),
+                };
+            }
+        }
+        0x800 => {
+            if (ins & 0xff00) == 0xc800 {
+                return Ins::TstImmR0 {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0x900 => {
+            if (ins & 0xff00) == 0xc900 {
+                return Ins::AndImmR0 {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0xa00 => {
+            if (ins & 0xff00) == 0xca00 {
+                return Ins::XorImmR0 {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0xb00 => {
+            if (ins & 0xff00) == 0xcb00 {
+                return Ins::OrImmR0 {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0xc00 => {
+            if (ins & 0xff00) == 0xcc00 {
+                return Ins::TstbImmAtR0Gbr {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0xd00 => {
+            if (ins & 0xff00) == 0xcd00 {
+                return Ins::AndbImmAtR0Gbr {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0xe00 => {
+            if (ins & 0xff00) == 0xce00 {
+                return Ins::XorbImmAtR0Gbr {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        0xf00 => {
+            if (ins & 0xff00) == 0xcf00 {
+                return Ins::OrbImmAtR0Gbr {
+                    imm: ((ins >> 0u8) & 255u16) as u8,
+                };
+            }
+        }
+        _ => {}
     }
     Ins::Word(ins)
 }
@@ -1580,326 +1992,421 @@ fn parse_groupe(ins: u16, pc: u32, opts: &Options) -> Ins {
 fn parse_groupf(ins: u16, pc: u32, opts: &Options) -> Ins {
     let _ = pc;
     let _ = opts;
-    #[cfg(feature = "sh4")]
-    if (ins & 0xffff) == 0xf3fd {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+    match ins & 0xf {
+        0x0 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf000 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FaddFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::Fschg;
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xffff) == 0xfbfd {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x1 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf001 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FsubFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::Frchg;
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf3ff) == 0xf1fd {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x2 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf002 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmulFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FtrvXmtrxFvn {
-            fvn: VecReg::from_u8(((ins >> 10u8) & 3u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf1ff) == 0xf0ad {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x3 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf003 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FdivFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FcnvsdFpulDrn {
-            drn: DReg::from_u8(((ins >> 9u8) & 7u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf1ff) == 0xf0bd {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x4 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf004 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FcmpeqFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FcnvdsDrnFpul {
-            drn: DReg::from_u8(((ins >> 9u8) & 7u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf1ff) == 0xf0fd {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x5 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf005 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FcmpgtFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FscaFpulDrn {
-            drn: DReg::from_u8(((ins >> 9u8) & 7u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf00d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x6 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf006 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovAtR0RmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FstsFpulFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf01d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x7 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf007 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovFrmAtR0Rn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FldsFrnFpul {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf02d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x8 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf008 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovAtRmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FloatFpulFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf03d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0x9 => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf009 {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovAtRmIncFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FtrcFrnFpul {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf04d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xa => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf00a {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovFrmAtRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FnegFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf05d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xb => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf00b {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovFrmAtDecRn {
+                    rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FabsFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf06d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xc => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf00c {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmovFrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::FsqrtFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf08d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xd => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xffff) == 0xf3fd {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Fschg;
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xffff) == 0xfbfd {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Frchg;
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf3ff) == 0xf1fd {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FtrvXmtrxFvn {
+                    fvn: VecReg::from_u8(((ins >> 10u8) & 3u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf1ff) == 0xf0ad {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FcnvsdFpulDrn {
+                    drn: DReg::from_u8(((ins >> 9u8) & 7u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf1ff) == 0xf0bd {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FcnvdsDrnFpul {
+                    drn: DReg::from_u8(((ins >> 9u8) & 7u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf1ff) == 0xf0fd {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FscaFpulDrn {
+                    drn: DReg::from_u8(((ins >> 9u8) & 7u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf00d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FstsFpulFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf01d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FldsFrnFpul {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf02d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FloatFpulFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf03d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FtrcFrnFpul {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf04d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FnegFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf05d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FabsFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf06d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FsqrtFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf08d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Fldi0Frn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf09d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::Fldi1Frn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf0ed {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FiprFvmFvn {
+                    fvn: VecReg::from_u8(((ins >> 10u8) & 3u16) as u8),
+                    fvm: VecReg::from_u8(((ins >> 8u8) & 3u16) as u8),
+                };
+            }
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf0ff) == 0xf07d {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FsrraFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::Fldi0Frn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf09d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
+        0xe => {
+            #[cfg(feature = "sh4")]
+            if (ins & 0xf00f) == 0xf00e {
+                const VERSIONS: Versions = Versions::of(
+                    &[#[cfg(feature = "sh4")] Version::Sh4],
+                );
+                if !VERSIONS.has(opts.version) {
+                    return Ins::Word(ins);
+                }
+                return Ins::FmacFr0FrmFrn {
+                    frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
+                    frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
+                };
+            }
         }
-        return Ins::Fldi1Frn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf0ed {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FiprFvmFvn {
-            fvn: VecReg::from_u8(((ins >> 10u8) & 3u16) as u8),
-            fvm: VecReg::from_u8(((ins >> 8u8) & 3u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf0ff) == 0xf07d {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FsrraFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf000 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FaddFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf001 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FsubFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf002 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmulFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf003 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FdivFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf004 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FcmpeqFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf005 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FcmpgtFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf006 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovAtR0RmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf007 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovFrmAtR0Rn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf008 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovAtRmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf009 {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovAtRmIncFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            rm: Reg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf00a {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovFrmAtRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf00b {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovFrmAtDecRn {
-            rn: Reg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf00c {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmovFrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
-    }
-    #[cfg(feature = "sh4")]
-    if (ins & 0xf00f) == 0xf00e {
-        const VERSIONS: Versions = Versions::of(&[#[cfg(feature = "sh4")] Version::Sh4]);
-        if !VERSIONS.has(opts.version) {
-            return Ins::Word(ins);
-        }
-        return Ins::FmacFr0FrmFrn {
-            frn: FReg::from_u8(((ins >> 8u8) & 15u16) as u8),
-            frm: FReg::from_u8(((ins >> 4u8) & 15u16) as u8),
-        };
+        _ => {}
     }
     Ins::Word(ins)
 }

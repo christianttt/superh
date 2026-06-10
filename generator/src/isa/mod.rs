@@ -78,6 +78,27 @@ impl Isa {
                 }
             }
         }
+
+        // No two patterns may match the same instruction word. Overlaps make the
+        // decode order-dependent, and the generated version check returns
+        // `Ins::Word` without falling through to other matching patterns — an
+        // overlapping pair would silently mis-decode for older SH versions.
+        for (i, a) in self.opcodes.iter().enumerate() {
+            let (mask_a, value_a) = a.mask_value();
+            for b in &self.opcodes[i + 1..] {
+                let (mask_b, value_b) = b.mask_value();
+                if (value_a ^ value_b) & (mask_a & mask_b) == 0 {
+                    bail!(
+                        "Opcodes '{}' ({}) and '{}' ({}) overlap: some instruction \
+                         words match both patterns",
+                        a.name,
+                        a.pattern,
+                        b.name,
+                        b.pattern
+                    );
+                }
+            }
+        }
         Ok(())
     }
 }

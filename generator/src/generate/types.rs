@@ -275,22 +275,29 @@ fn gen_options() -> TokenStream {
             /// The SuperH version to decode. Instructions introduced after this version
             /// are returned as [`Ins::Word`] even if compiled in.
             pub version: Version,
-            /// Show raw displacement values instead of computed effective addresses.
-            pub raw_disp: bool,
             /// Display immediate values in decimal instead of hex.
             pub imm_decimal: bool,
         }
 
         impl Default for Options {
             fn default() -> Self {
-                Self { version: Version::default(), raw_disp: false, imm_decimal: false }
+                Self { version: Version::default(), imm_decimal: false }
             }
         }
     }
 }
 
 fn gen_ins_enum(isa: &Isa) -> TokenStream {
-    let variants: Vec<TokenStream> = isa.opcodes.iter().map(gen_ins_variant).collect();
+    // Every variant carries an explicit discriminant (its index in isa.yaml).
+    // Without this, #[cfg]-gated variants that are compiled out would shift the
+    // tags of all later variants, breaking the Ins::discriminant() ↔
+    // parse_with_discriminant() correspondence across feature subsets.
+    let variants: Vec<TokenStream> =
+        isa.opcodes.iter().enumerate().map(|(i, op)| gen_ins_variant(i, op)).collect();
+
+    let word_disc = discriminant_literal(isa.opcodes.len());
+    let byte_disc = discriminant_literal(isa.opcodes.len() + 1);
+    let long_disc = discriminant_literal(isa.opcodes.len() + 2);
 
     quote! {
         /// A decoded SuperH instruction.
@@ -300,18 +307,24 @@ fn gen_ins_enum(isa: &Isa) -> TokenStream {
         pub enum Ins {
             #(#variants,)*
             /// Raw 16-bit word (emitted when no instruction matches).
-            Word(u16),
+            Word(u16) = #word_disc,
             /// Single raw data byte (emitted in [`ParseMode::Data`](crate::ParseMode)).
-            Byte(u8),
+            Byte(u8) = #byte_disc,
             /// Raw 32-bit data longword (emitted in [`ParseMode::Data`](crate::ParseMode)).
-            Long(u32),
+            Long(u32) = #long_disc,
         }
     }
 }
 
-fn gen_ins_variant(op: &Opcode) -> TokenStream {
+fn discriminant_literal(i: usize) -> proc_macro2::Literal {
+    proc_macro2::Literal::u16_unsuffixed(u16::try_from(i).expect("more than u16::MAX opcodes"))
+}
+
+fn gen_ins_variant(index: usize, op: &Opcode) -> TokenStream {
     let name = format_ident!("{}", op.name);
     let cfg = version_cfg(op.version);
+    let disc = discriminant_literal(index);
+    let doc = disp_doc(op);
 
     // Build the struct fields from the unique field letters in the pattern
     // Enum variant fields do not use `pub` — they inherit the enum's visibility.
@@ -327,15 +340,33 @@ fn gen_ins_variant(op: &Opcode) -> TokenStream {
 
     if fields.is_empty() {
         quote! {
+            #doc
             #cfg
-            #name
+            #name = #disc
         }
     } else {
         quote! {
+            #doc
             #cfg
-            #name { #(#fields,)* }
+            #name { #(#fields,)* } = #disc
         }
     }
+}
+
+/// Doc comment clarifying the semantics of the `disp` field, which differ between
+/// PC-relative 4-byte-scaled loads (computed offset) and everything else (raw field).
+fn disp_doc(op: &Opcode) -> TokenStream {
+    if !op.fields.values().any(|ft| matches!(ft, FieldType::Disp)) {
+        return quote! {};
+    }
+    let text = if op.pc_bias.is_some() && op.scale.unwrap_or(1) >= 4 {
+        " `disp` is the resolved offset from PC (effective address − PC), computed at \
+         decode time — not the raw encoded displacement field."
+    } else {
+        " `disp` is the raw encoded displacement field; the displayed offset is \
+         `disp * scale` (plus the PC bias for PC-relative forms)."
+    };
+    quote! { #[doc = #text] }
 }
 
 fn field_type_tokens(ft: &FieldType, op: &Opcode) -> TokenStream {

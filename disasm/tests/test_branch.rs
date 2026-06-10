@@ -72,6 +72,14 @@ fn is_branch_false() {
     assert!(!parse(0xffff, 0, &opts()).is_branch()); // .word
 }
 
+#[test]
+fn trapa_is_branch_but_not_delayed() {
+    // trapa transfers control to the trap handler; it has no delay slot.
+    let ins = parse(0xc320, 0, &opts()); // trapa #0x20
+    assert!(ins.is_branch());
+    assert!(!ins.is_delayed_branch());
+}
+
 // ─── PC-relative branch display ───────────────────────────────────────────────
 
 #[test]

@@ -71,8 +71,9 @@ impl From<VecReg> for AnyReg {
 
 const MAX_REGS: usize = 8;
 
-/// List of registers that an instruction either defines or uses, see [`crate::Ins::defs`]
-/// and [`crate::Ins::uses`].
+/// Set of registers that an instruction either defines or uses, see [`crate::Ins::defs`]
+/// and [`crate::Ins::uses`]. Each register appears at most once, even when the same
+/// register fills two operand slots (e.g. `mov.b r0, @(disp, r0)`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DefsUses {
     regs: [AnyReg; MAX_REGS],
@@ -88,8 +89,12 @@ impl DefsUses {
     where
         T: Into<AnyReg>,
     {
+        let reg = reg.into();
+        if self.contains(reg) {
+            return;
+        }
         debug_assert!(self.len < MAX_REGS, "DefsUses capacity exceeded (MAX_REGS={MAX_REGS})");
-        self.regs[self.len] = reg.into();
+        self.regs[self.len] = reg;
         self.len += 1;
     }
 

@@ -1101,13 +1101,16 @@ opcodes:
     defs: []
     uses: [pr]
 
+  # rte restores SR (and therefore the T bit) — from SSR on SH3+, from the
+  # stack on SH1/SH2. The whole-SR write must be modeled so dataflow analysis
+  # does not treat T as live across an rte.
   - name: Rte
     opcode: "rte"
     args: ""
     version: sh1
     pattern: "0000000000101011"
     fields: {}
-    defs: []
+    defs: [sr, t]
     uses: [ssr, spc]
 
   # ---------------------------------------------------------------------------
@@ -1196,6 +1199,8 @@ opcodes:
     uses: []
 
   # STC — store control register to Rn
+  # Instructions that read or write SR as a whole also read/write the T bit
+  # (T is bit 0 of SR), so they list both sr and t.
   - name: StcSrRn
     opcode: "stc"
     args: "sr, {rn}"
@@ -1203,7 +1208,7 @@ opcodes:
     pattern: "0000nnnn00000010"
     fields: { n: reg }
     defs: [rn]
-    uses: [sr]
+    uses: [sr, t]
 
   - name: StcGbrRn
     opcode: "stc"
@@ -1268,6 +1273,10 @@ opcodes:
     defs: [rn]
     uses: []
 
+  # The r5_bank/r6_bank/r7_bank encodings below use the 0bbb half of the bank
+  # field, which the Renesas manuals list as reserved (the architectural bank
+  # encoding is 1bbb, handled by the *Bank* entries above). They are decoded
+  # here deliberately for parity with the sh4dis reference disassembler.
   - name: StcLoBank5Rn
     opcode: "stc"
     args: "r5_bank, {rn}"
@@ -1303,7 +1312,7 @@ opcodes:
     pattern: "0100nnnn00000011"
     fields: { n: reg }
     defs: [rn]
-    uses: [rn, sr]
+    uses: [rn, sr, t]
 
   - name: StclGbrAtDecRn
     opcode: "stc.l"
@@ -1402,7 +1411,7 @@ opcodes:
     version: sh1
     pattern: "0100mmmm00001110"
     fields: { m: reg }
-    defs: [sr]
+    defs: [sr, t]
     uses: [rm]
 
   - name: LdcRmGbr
@@ -1450,6 +1459,8 @@ opcodes:
     defs: [dbr]
     uses: [rm]
 
+  # ldc Rm,sgr / ldc.l @Rm+,sgr are SH4A additions (SGR is read-only on SH4);
+  # they are decoded under sh4 for parity with the sh4dis reference disassembler.
   - name: LdcRmSgr
     opcode: "ldc"
     args: "{rm}, sgr"
@@ -1502,7 +1513,7 @@ opcodes:
     version: sh1
     pattern: "0100mmmm00000111"
     fields: { m: reg }
-    defs: [rm, sr]
+    defs: [rm, sr, t]
     uses: [rm]
 
   - name: LdclAtRmIncGbr

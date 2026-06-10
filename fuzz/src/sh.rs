@@ -105,11 +105,11 @@ impl Fuzzer {
         thread::spawn(move || {
             for _ in 0..repeat {
                 for word in range.clone() {
-                    let s1 = superh::parse(word, pc, &opts).display(&opts).to_string();
-                    let s2 = superh::parse(word, pc, &opts).display(&opts).to_string();
+                    let ins = superh::parse(word, pc, &opts);
+                    let re = superh::parse_with_discriminant(word, ins.discriminant(), pc, &opts);
                     assert_eq!(
-                        s1, s2,
-                        "non-deterministic output for word 0x{word:04x} at pc=0x{pc:08x}"
+                        ins, re,
+                        "discriminant round-trip failed for word 0x{word:04x} at pc=0x{pc:08x}"
                     );
                 }
             }

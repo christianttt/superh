@@ -5,8 +5,9 @@ use crate::{Ins, Options, parse};
 pub enum ParseMode {
     /// Decode 16-bit SH instruction words.
     Instruction,
-    /// Emit raw data: 4-byte-aligned words as [`Ins::Long`], 2-byte-aligned as
-    /// [`Ins::Word`], and unaligned bytes as [`Ins::Byte`].
+    /// Emit raw data: 4-byte-aligned addresses as [`Ins::Long`], 2-byte-aligned as
+    /// [`Ins::Word`], and unaligned bytes as [`Ins::Byte`]. Alignment is judged by
+    /// the current PC (the memory address), not the buffer offset.
     Data,
 }
 
@@ -85,20 +86,21 @@ impl<'a> Parser<'a> {
         self.offset = offset.min(self.bytes.len());
     }
 
-    /// Move to `offset`, clamping to the buffer length, and advance PC by the same delta.
+    /// Move to `offset`, clamping to the buffer length, and adjust PC by the same
+    /// (signed) delta, so backward moves rewind PC as well.
     pub fn goto_offset(&mut self, offset: usize) {
         let new_offset = offset.min(self.bytes.len());
-        let delta = new_offset.saturating_sub(self.offset);
-        self.pc = self.pc.wrapping_add(delta as u32);
+        #[allow(clippy::cast_possible_truncation)]
+        let delta = (new_offset as u64).wrapping_sub(self.offset as u64) as u32;
+        self.pc = self.pc.wrapping_add(delta);
         self.offset = new_offset;
     }
 
-    /// Advance both offset and PC by `delta` bytes.
+    /// Move offset and PC by `delta` bytes, clamping the offset to `[0, len]`.
+    /// PC is adjusted by the clamped amount, keeping offset and PC in sync.
     pub fn jump(&mut self, delta: isize) {
-        #[allow(clippy::cast_sign_loss)]
-        let delta = delta as usize;
-        self.offset = self.offset.wrapping_add(delta);
-        self.pc = self.pc.wrapping_add(delta as u32);
+        let target = self.offset.saturating_add_signed(delta).min(self.bytes.len());
+        self.goto_offset(target);
     }
 
     fn read_u16(&self) -> Option<u16> {
@@ -141,12 +143,14 @@ impl Iterator for Parser<'_> {
                 Some(ins)
             }
             ParseMode::Data => {
+                // Alignment follows the memory address (PC), not the buffer offset,
+                // so a buffer mapped at an unaligned base address splits correctly.
                 let start = self.offset;
-                if (self.offset & 3) == 0 && self.offset + 4 <= self.bytes.len() {
+                if (self.pc & 3) == 0 && self.offset + 4 <= self.bytes.len() {
                     let value = self.read_u32()?;
                     self.jump(4);
                     Some(Ins::Long(value))
-                } else if (self.offset & 1) == 0 && self.offset + 2 <= self.bytes.len() {
+                } else if (self.pc & 1) == 0 && self.offset + 2 <= self.bytes.len() {
                     let value = self.read_u16()?;
                     self.jump(2);
                     Some(Ins::Word(value))
@@ -155,7 +159,6 @@ impl Iterator for Parser<'_> {
                     self.jump(1);
                     Some(Ins::Byte(value))
                 } else {
-                    self.goto_offset(self.bytes.len());
                     None
                 }
             }

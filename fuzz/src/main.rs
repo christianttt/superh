@@ -127,7 +127,7 @@ Tests:
   parse           Parse all 65536 SH instruction words exhaustively
   parse_random    Parse random instruction words
   display         Parse and format every instruction word
-  reparse         Verify parse+display is deterministic for every word
+  reparse         Verify parse_with_discriminant round-trips every word
   defs            Call defs() on every parsed instruction
   uses            Call uses() on every parsed instruction
   dump            Dump all 65536 disassembly results to stdout (for diff testing)

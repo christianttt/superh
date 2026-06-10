@@ -14,6 +14,7 @@
     clippy::match_same_arms,
     clippy::uninlined_format_args,
     clippy::doc_markdown,
+    clippy::collapsible_match,
 )]
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -314,8 +315,6 @@ pub struct Options {
     /// The SuperH version to decode. Instructions introduced after this version
     /// are returned as [`Ins::Word`] even if compiled in.
     pub version: Version,
-    /// Show raw displacement values instead of computed effective addresses.
-    pub raw_disp: bool,
     /// Display immediate values in decimal instead of hex.
     pub imm_decimal: bool,
 }
@@ -323,7 +322,6 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             version: Version::default(),
-            raw_disp: false,
             imm_decimal: false,
         }
     }
@@ -333,323 +331,338 @@ impl Default for Options {
 #[non_exhaustive]
 #[repr(u16)]
 pub enum Ins {
-    MovRmRn { rn: Reg, rm: Reg },
-    MovImmRn { rn: Reg, imm: i8 },
-    MovwAtDispPcRn { rn: Reg, disp: u8 },
-    MovlAtDispPcRn { rn: Reg, disp: u32 },
-    MovbRmAtRn { rn: Reg, rm: Reg },
-    MovwRmAtRn { rn: Reg, rm: Reg },
-    MovlRmAtRn { rn: Reg, rm: Reg },
-    MovbAtRmRn { rn: Reg, rm: Reg },
-    MovwAtRmRn { rn: Reg, rm: Reg },
-    MovlAtRmRn { rn: Reg, rm: Reg },
-    MovbRmAtDecRn { rn: Reg, rm: Reg },
-    MovwRmAtDecRn { rn: Reg, rm: Reg },
-    MovlRmAtDecRn { rn: Reg, rm: Reg },
-    MovbAtRmIncRn { rn: Reg, rm: Reg },
-    MovwAtRmIncRn { rn: Reg, rm: Reg },
-    MovlAtRmIncRn { rn: Reg, rm: Reg },
-    MovbR0AtDispRn { rn: Reg, disp: u8 },
-    MovwR0AtDispRn { rn: Reg, disp: u8 },
-    MovlRmAtDispRn { rn: Reg, rm: Reg, disp: u8 },
-    MovbAtDispRmR0 { rm: Reg, disp: u8 },
-    MovwAtDispRmR0 { rm: Reg, disp: u8 },
-    MovlAtDispRmRn { rn: Reg, rm: Reg, disp: u8 },
-    MovbRmAtR0Rn { rn: Reg, rm: Reg },
-    MovwRmAtR0Rn { rn: Reg, rm: Reg },
-    MovlRmAtR0Rn { rn: Reg, rm: Reg },
-    MovbAtR0RmRn { rn: Reg, rm: Reg },
-    MovwAtR0RmRn { rn: Reg, rm: Reg },
-    MovlAtR0RmRn { rn: Reg, rm: Reg },
-    MovbR0AtDispGbr { disp: u8 },
-    MovwR0AtDispGbr { disp: u8 },
-    MovlR0AtDispGbr { disp: u8 },
-    MovbAtDispGbrR0 { disp: u8 },
-    MovwAtDispGbrR0 { disp: u8 },
-    MovlAtDispGbrR0 { disp: u8 },
-    Mova { disp: u32 },
-    Movt { rn: Reg },
+    MovRmRn { rn: Reg, rm: Reg } = 0,
+    MovImmRn { rn: Reg, imm: i8 } = 1,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovwAtDispPcRn { rn: Reg, disp: u8 } = 2,
+    /// `disp` is the resolved offset from PC (effective address − PC), computed at decode time — not the raw encoded displacement field.
+    MovlAtDispPcRn { rn: Reg, disp: u32 } = 3,
+    MovbRmAtRn { rn: Reg, rm: Reg } = 4,
+    MovwRmAtRn { rn: Reg, rm: Reg } = 5,
+    MovlRmAtRn { rn: Reg, rm: Reg } = 6,
+    MovbAtRmRn { rn: Reg, rm: Reg } = 7,
+    MovwAtRmRn { rn: Reg, rm: Reg } = 8,
+    MovlAtRmRn { rn: Reg, rm: Reg } = 9,
+    MovbRmAtDecRn { rn: Reg, rm: Reg } = 10,
+    MovwRmAtDecRn { rn: Reg, rm: Reg } = 11,
+    MovlRmAtDecRn { rn: Reg, rm: Reg } = 12,
+    MovbAtRmIncRn { rn: Reg, rm: Reg } = 13,
+    MovwAtRmIncRn { rn: Reg, rm: Reg } = 14,
+    MovlAtRmIncRn { rn: Reg, rm: Reg } = 15,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovbR0AtDispRn { rn: Reg, disp: u8 } = 16,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovwR0AtDispRn { rn: Reg, disp: u8 } = 17,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovlRmAtDispRn { rn: Reg, rm: Reg, disp: u8 } = 18,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovbAtDispRmR0 { rm: Reg, disp: u8 } = 19,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovwAtDispRmR0 { rm: Reg, disp: u8 } = 20,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovlAtDispRmRn { rn: Reg, rm: Reg, disp: u8 } = 21,
+    MovbRmAtR0Rn { rn: Reg, rm: Reg } = 22,
+    MovwRmAtR0Rn { rn: Reg, rm: Reg } = 23,
+    MovlRmAtR0Rn { rn: Reg, rm: Reg } = 24,
+    MovbAtR0RmRn { rn: Reg, rm: Reg } = 25,
+    MovwAtR0RmRn { rn: Reg, rm: Reg } = 26,
+    MovlAtR0RmRn { rn: Reg, rm: Reg } = 27,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovbR0AtDispGbr { disp: u8 } = 28,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovwR0AtDispGbr { disp: u8 } = 29,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovlR0AtDispGbr { disp: u8 } = 30,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovbAtDispGbrR0 { disp: u8 } = 31,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovwAtDispGbrR0 { disp: u8 } = 32,
+    /// `disp` is the raw encoded displacement field; the displayed offset is `disp * scale` (plus the PC bias for PC-relative forms).
+    MovlAtDispGbrR0 { disp: u8 } = 33,
+    /// `disp` is the resolved offset from PC (effective address − PC), computed at decode time — not the raw encoded displacement field.
+    Mova { disp: u32 } = 34,
+    Movt { rn: Reg } = 35,
     #[cfg(feature = "sh4")]
-    MovcalR0AtRn { rn: Reg },
-    SwapbRmRn { rn: Reg, rm: Reg },
-    SwapwRmRn { rn: Reg, rm: Reg },
-    XtrctRmRn { rn: Reg, rm: Reg },
-    AddRmRn { rn: Reg, rm: Reg },
-    AddImmRn { rn: Reg, imm: i8 },
-    AddcRmRn { rn: Reg, rm: Reg },
-    AddvRmRn { rn: Reg, rm: Reg },
-    CmpeqImmR0 { imm: i8 },
-    CmpeqRmRn { rn: Reg, rm: Reg },
-    CmpgeRmRn { rn: Reg, rm: Reg },
-    CmpgtRmRn { rn: Reg, rm: Reg },
-    CmphiRmRn { rn: Reg, rm: Reg },
-    CmphsRmRn { rn: Reg, rm: Reg },
-    CmpplRn { rn: Reg },
-    CmppzRn { rn: Reg },
-    CmpstrRmRn { rn: Reg, rm: Reg },
-    Div0sRmRn { rn: Reg, rm: Reg },
-    Div0u,
-    Div1RmRn { rn: Reg, rm: Reg },
+    MovcalR0AtRn { rn: Reg } = 36,
+    SwapbRmRn { rn: Reg, rm: Reg } = 37,
+    SwapwRmRn { rn: Reg, rm: Reg } = 38,
+    XtrctRmRn { rn: Reg, rm: Reg } = 39,
+    AddRmRn { rn: Reg, rm: Reg } = 40,
+    AddImmRn { rn: Reg, imm: i8 } = 41,
+    AddcRmRn { rn: Reg, rm: Reg } = 42,
+    AddvRmRn { rn: Reg, rm: Reg } = 43,
+    CmpeqImmR0 { imm: i8 } = 44,
+    CmpeqRmRn { rn: Reg, rm: Reg } = 45,
+    CmpgeRmRn { rn: Reg, rm: Reg } = 46,
+    CmpgtRmRn { rn: Reg, rm: Reg } = 47,
+    CmphiRmRn { rn: Reg, rm: Reg } = 48,
+    CmphsRmRn { rn: Reg, rm: Reg } = 49,
+    CmpplRn { rn: Reg } = 50,
+    CmppzRn { rn: Reg } = 51,
+    CmpstrRmRn { rn: Reg, rm: Reg } = 52,
+    Div0sRmRn { rn: Reg, rm: Reg } = 53,
+    Div0u = 54,
+    Div1RmRn { rn: Reg, rm: Reg } = 55,
     #[cfg(feature = "sh2")]
-    DmulslRmRn { rn: Reg, rm: Reg },
+    DmulslRmRn { rn: Reg, rm: Reg } = 56,
     #[cfg(feature = "sh2")]
-    DmuluRmRn { rn: Reg, rm: Reg },
+    DmuluRmRn { rn: Reg, rm: Reg } = 57,
     #[cfg(feature = "sh2")]
-    DtRn { rn: Reg },
-    ExtsbRmRn { rn: Reg, rm: Reg },
-    ExtswRmRn { rn: Reg, rm: Reg },
-    ExtubRmRn { rn: Reg, rm: Reg },
-    ExtuwRmRn { rn: Reg, rm: Reg },
+    DtRn { rn: Reg } = 58,
+    ExtsbRmRn { rn: Reg, rm: Reg } = 59,
+    ExtswRmRn { rn: Reg, rm: Reg } = 60,
+    ExtubRmRn { rn: Reg, rm: Reg } = 61,
+    ExtuwRmRn { rn: Reg, rm: Reg } = 62,
     #[cfg(feature = "sh2")]
-    MaclAtRmIncAtRnInc { rn: Reg, rm: Reg },
-    MacwAtRmIncAtRnInc { rn: Reg, rm: Reg },
+    MaclAtRmIncAtRnInc { rn: Reg, rm: Reg } = 63,
+    MacwAtRmIncAtRnInc { rn: Reg, rm: Reg } = 64,
     #[cfg(feature = "sh2")]
-    MullRmRn { rn: Reg, rm: Reg },
-    MulswRmRn { rn: Reg, rm: Reg },
-    MuluwRmRn { rn: Reg, rm: Reg },
-    NegRmRn { rn: Reg, rm: Reg },
-    NegcRmRn { rn: Reg, rm: Reg },
-    SubRmRn { rn: Reg, rm: Reg },
-    SubcRmRn { rn: Reg, rm: Reg },
-    SubvRmRn { rn: Reg, rm: Reg },
-    AndRmRn { rn: Reg, rm: Reg },
-    AndImmR0 { imm: u8 },
-    AndbImmAtR0Gbr { imm: u8 },
-    NotRmRn { rn: Reg, rm: Reg },
-    OrRmRn { rn: Reg, rm: Reg },
-    OrImmR0 { imm: u8 },
-    OrbImmAtR0Gbr { imm: u8 },
-    TasbAtRn { rn: Reg },
-    TstRmRn { rn: Reg, rm: Reg },
-    TstImmR0 { imm: u8 },
-    TstbImmAtR0Gbr { imm: u8 },
-    XorRmRn { rn: Reg, rm: Reg },
-    XorImmR0 { imm: u8 },
-    XorbImmAtR0Gbr { imm: u8 },
-    RotlRn { rn: Reg },
-    RotrRn { rn: Reg },
-    RotclRn { rn: Reg },
-    RotcrRn { rn: Reg },
+    MullRmRn { rn: Reg, rm: Reg } = 65,
+    MulswRmRn { rn: Reg, rm: Reg } = 66,
+    MuluwRmRn { rn: Reg, rm: Reg } = 67,
+    NegRmRn { rn: Reg, rm: Reg } = 68,
+    NegcRmRn { rn: Reg, rm: Reg } = 69,
+    SubRmRn { rn: Reg, rm: Reg } = 70,
+    SubcRmRn { rn: Reg, rm: Reg } = 71,
+    SubvRmRn { rn: Reg, rm: Reg } = 72,
+    AndRmRn { rn: Reg, rm: Reg } = 73,
+    AndImmR0 { imm: u8 } = 74,
+    AndbImmAtR0Gbr { imm: u8 } = 75,
+    NotRmRn { rn: Reg, rm: Reg } = 76,
+    OrRmRn { rn: Reg, rm: Reg } = 77,
+    OrImmR0 { imm: u8 } = 78,
+    OrbImmAtR0Gbr { imm: u8 } = 79,
+    TasbAtRn { rn: Reg } = 80,
+    TstRmRn { rn: Reg, rm: Reg } = 81,
+    TstImmR0 { imm: u8 } = 82,
+    TstbImmAtR0Gbr { imm: u8 } = 83,
+    XorRmRn { rn: Reg, rm: Reg } = 84,
+    XorImmR0 { imm: u8 } = 85,
+    XorbImmAtR0Gbr { imm: u8 } = 86,
+    RotlRn { rn: Reg } = 87,
+    RotrRn { rn: Reg } = 88,
+    RotclRn { rn: Reg } = 89,
+    RotcrRn { rn: Reg } = 90,
     #[cfg(feature = "sh3")]
-    ShadRmRn { rn: Reg, rm: Reg },
-    ShalRn { rn: Reg },
-    SharRn { rn: Reg },
+    ShadRmRn { rn: Reg, rm: Reg } = 91,
+    ShalRn { rn: Reg } = 92,
+    SharRn { rn: Reg } = 93,
     #[cfg(feature = "sh3")]
-    ShldRmRn { rn: Reg, rm: Reg },
-    ShllRn { rn: Reg },
-    Shll2Rn { rn: Reg },
-    Shll8Rn { rn: Reg },
-    Shll16Rn { rn: Reg },
-    ShlrRn { rn: Reg },
-    Shlr2Rn { rn: Reg },
-    Shlr8Rn { rn: Reg },
-    Shlr16Rn { rn: Reg },
-    Bt { disp: BranchTarget },
+    ShldRmRn { rn: Reg, rm: Reg } = 94,
+    ShllRn { rn: Reg } = 95,
+    Shll2Rn { rn: Reg } = 96,
+    Shll8Rn { rn: Reg } = 97,
+    Shll16Rn { rn: Reg } = 98,
+    ShlrRn { rn: Reg } = 99,
+    Shlr2Rn { rn: Reg } = 100,
+    Shlr8Rn { rn: Reg } = 101,
+    Shlr16Rn { rn: Reg } = 102,
+    Bt { disp: BranchTarget } = 103,
     #[cfg(feature = "sh2")]
-    Bts { disp: BranchTarget },
-    Bf { disp: BranchTarget },
+    Bts { disp: BranchTarget } = 104,
+    Bf { disp: BranchTarget } = 105,
     #[cfg(feature = "sh2")]
-    Bfs { disp: BranchTarget },
-    Bra { disp: BranchTarget },
-    Bsr { disp: BranchTarget },
+    Bfs { disp: BranchTarget } = 106,
+    Bra { disp: BranchTarget } = 107,
+    Bsr { disp: BranchTarget } = 108,
     #[cfg(feature = "sh2")]
-    BrafRn { rn: Reg },
+    BrafRn { rn: Reg } = 109,
     #[cfg(feature = "sh2")]
-    BsrfRn { rn: Reg },
-    JmpAtRn { rn: Reg },
-    JsrAtRn { rn: Reg },
-    Rts,
-    Rte,
-    Clrmac,
+    BsrfRn { rn: Reg } = 110,
+    JmpAtRn { rn: Reg } = 111,
+    JsrAtRn { rn: Reg } = 112,
+    Rts = 113,
+    Rte = 114,
+    Clrmac = 115,
     #[cfg(feature = "sh3")]
-    Clrs,
-    Clrt,
+    Clrs = 116,
+    Clrt = 117,
     #[cfg(feature = "sh3")]
-    Sets,
-    Sett,
-    Nop,
-    Sleep,
+    Sets = 118,
+    Sett = 119,
+    Nop = 120,
+    Sleep = 121,
     #[cfg(feature = "sh3")]
-    Ldtlb,
-    Trapa { imm: u8 },
-    StcSrRn { rn: Reg },
-    StcGbrRn { rn: Reg },
-    StcVbrRn { rn: Reg },
+    Ldtlb = 122,
+    Trapa { imm: u8 } = 123,
+    StcSrRn { rn: Reg } = 124,
+    StcGbrRn { rn: Reg } = 125,
+    StcVbrRn { rn: Reg } = 126,
     #[cfg(feature = "sh3")]
-    StcSsrRn { rn: Reg },
+    StcSsrRn { rn: Reg } = 127,
     #[cfg(feature = "sh3")]
-    StcSpcRn { rn: Reg },
+    StcSpcRn { rn: Reg } = 128,
     #[cfg(feature = "sh4")]
-    StcDbrRn { rn: Reg },
+    StcDbrRn { rn: Reg } = 129,
     #[cfg(feature = "sh4")]
-    StcSgrRn { rn: Reg },
+    StcSgrRn { rn: Reg } = 130,
     #[cfg(feature = "sh3")]
-    StcBankRn { rn: Reg, bank: u8 },
+    StcBankRn { rn: Reg, bank: u8 } = 131,
     #[cfg(feature = "sh3")]
-    StcLoBank5Rn { rn: Reg },
+    StcLoBank5Rn { rn: Reg } = 132,
     #[cfg(feature = "sh3")]
-    StcLoBank6Rn { rn: Reg },
+    StcLoBank6Rn { rn: Reg } = 133,
     #[cfg(feature = "sh3")]
-    StcLoBank7Rn { rn: Reg },
-    StclSrAtDecRn { rn: Reg },
-    StclGbrAtDecRn { rn: Reg },
-    StclVbrAtDecRn { rn: Reg },
+    StcLoBank7Rn { rn: Reg } = 134,
+    StclSrAtDecRn { rn: Reg } = 135,
+    StclGbrAtDecRn { rn: Reg } = 136,
+    StclVbrAtDecRn { rn: Reg } = 137,
     #[cfg(feature = "sh3")]
-    StclSsrAtDecRn { rn: Reg },
+    StclSsrAtDecRn { rn: Reg } = 138,
     #[cfg(feature = "sh3")]
-    StclSpcAtDecRn { rn: Reg },
+    StclSpcAtDecRn { rn: Reg } = 139,
     #[cfg(feature = "sh4")]
-    StclDbrAtDecRn { rn: Reg },
+    StclDbrAtDecRn { rn: Reg } = 140,
     #[cfg(feature = "sh4")]
-    StclSgrAtDecRn { rn: Reg },
+    StclSgrAtDecRn { rn: Reg } = 141,
     #[cfg(feature = "sh3")]
-    StclBankAtDecRn { rn: Reg, bank: u8 },
+    StclBankAtDecRn { rn: Reg, bank: u8 } = 142,
     #[cfg(feature = "sh3")]
-    StclLoBank5AtDecRn { rn: Reg },
+    StclLoBank5AtDecRn { rn: Reg } = 143,
     #[cfg(feature = "sh3")]
-    StclLoBank6AtDecRn { rn: Reg },
+    StclLoBank6AtDecRn { rn: Reg } = 144,
     #[cfg(feature = "sh3")]
-    StclLoBank7AtDecRn { rn: Reg },
-    LdcRmSr { rm: Reg },
-    LdcRmGbr { rm: Reg },
-    LdcRmVbr { rm: Reg },
+    StclLoBank7AtDecRn { rn: Reg } = 145,
+    LdcRmSr { rm: Reg } = 146,
+    LdcRmGbr { rm: Reg } = 147,
+    LdcRmVbr { rm: Reg } = 148,
     #[cfg(feature = "sh3")]
-    LdcRmSsr { rm: Reg },
+    LdcRmSsr { rm: Reg } = 149,
     #[cfg(feature = "sh3")]
-    LdcRmSpc { rm: Reg },
+    LdcRmSpc { rm: Reg } = 150,
     #[cfg(feature = "sh4")]
-    LdcRmDbr { rm: Reg },
+    LdcRmDbr { rm: Reg } = 151,
     #[cfg(feature = "sh4")]
-    LdcRmSgr { rm: Reg },
+    LdcRmSgr { rm: Reg } = 152,
     #[cfg(feature = "sh3")]
-    LdcRmBank { rm: Reg, bank: u8 },
+    LdcRmBank { rm: Reg, bank: u8 } = 153,
     #[cfg(feature = "sh3")]
-    LdcRmLoBank5 { rm: Reg },
+    LdcRmLoBank5 { rm: Reg } = 154,
     #[cfg(feature = "sh3")]
-    LdcRmLoBank6 { rm: Reg },
+    LdcRmLoBank6 { rm: Reg } = 155,
     #[cfg(feature = "sh3")]
-    LdcRmLoBank7 { rm: Reg },
-    LdclAtRmIncSr { rm: Reg },
-    LdclAtRmIncGbr { rm: Reg },
-    LdclAtRmIncVbr { rm: Reg },
+    LdcRmLoBank7 { rm: Reg } = 156,
+    LdclAtRmIncSr { rm: Reg } = 157,
+    LdclAtRmIncGbr { rm: Reg } = 158,
+    LdclAtRmIncVbr { rm: Reg } = 159,
     #[cfg(feature = "sh3")]
-    LdclAtRmIncSsr { rm: Reg },
+    LdclAtRmIncSsr { rm: Reg } = 160,
     #[cfg(feature = "sh3")]
-    LdclAtRmIncSpc { rm: Reg },
+    LdclAtRmIncSpc { rm: Reg } = 161,
     #[cfg(feature = "sh4")]
-    LdclAtRmIncDbr { rm: Reg },
+    LdclAtRmIncDbr { rm: Reg } = 162,
     #[cfg(feature = "sh4")]
-    LdclAtRmIncSgr { rm: Reg },
+    LdclAtRmIncSgr { rm: Reg } = 163,
     #[cfg(feature = "sh3")]
-    LdclAtRmIncBank { rm: Reg, bank: u8 },
+    LdclAtRmIncBank { rm: Reg, bank: u8 } = 164,
     #[cfg(feature = "sh3")]
-    LdclAtRmIncLoBank5 { rm: Reg },
+    LdclAtRmIncLoBank5 { rm: Reg } = 165,
     #[cfg(feature = "sh3")]
-    LdclAtRmIncLoBank6 { rm: Reg },
+    LdclAtRmIncLoBank6 { rm: Reg } = 166,
     #[cfg(feature = "sh3")]
-    LdclAtRmIncLoBank7 { rm: Reg },
-    StsMachRn { rn: Reg },
-    StsMaclRn { rn: Reg },
-    StsPrRn { rn: Reg },
+    LdclAtRmIncLoBank7 { rm: Reg } = 167,
+    StsMachRn { rn: Reg } = 168,
+    StsMaclRn { rn: Reg } = 169,
+    StsPrRn { rn: Reg } = 170,
     #[cfg(feature = "sh4")]
-    StsFpscrRn { rn: Reg },
+    StsFpscrRn { rn: Reg } = 171,
     #[cfg(feature = "sh4")]
-    StsFpulRn { rn: Reg },
-    StslMachAtDecRn { rn: Reg },
-    StslMaclAtDecRn { rn: Reg },
-    StslPrAtDecRn { rn: Reg },
+    StsFpulRn { rn: Reg } = 172,
+    StslMachAtDecRn { rn: Reg } = 173,
+    StslMaclAtDecRn { rn: Reg } = 174,
+    StslPrAtDecRn { rn: Reg } = 175,
     #[cfg(feature = "sh4")]
-    StslFpscrAtDecRn { rn: Reg },
+    StslFpscrAtDecRn { rn: Reg } = 176,
     #[cfg(feature = "sh4")]
-    StslFpulAtDecRn { rn: Reg },
-    LdsRmMach { rm: Reg },
-    LdsRmMacl { rm: Reg },
-    LdsRmPr { rm: Reg },
+    StslFpulAtDecRn { rn: Reg } = 177,
+    LdsRmMach { rm: Reg } = 178,
+    LdsRmMacl { rm: Reg } = 179,
+    LdsRmPr { rm: Reg } = 180,
     #[cfg(feature = "sh4")]
-    LdsRmFpscr { rm: Reg },
+    LdsRmFpscr { rm: Reg } = 181,
     #[cfg(feature = "sh4")]
-    LdsRmFpul { rm: Reg },
-    LdslAtRmIncMach { rm: Reg },
-    LdslAtRmIncMacl { rm: Reg },
-    LdslAtRmIncPr { rm: Reg },
+    LdsRmFpul { rm: Reg } = 182,
+    LdslAtRmIncMach { rm: Reg } = 183,
+    LdslAtRmIncMacl { rm: Reg } = 184,
+    LdslAtRmIncPr { rm: Reg } = 185,
     #[cfg(feature = "sh4")]
-    LdslAtRmIncFpscr { rm: Reg },
+    LdslAtRmIncFpscr { rm: Reg } = 186,
     #[cfg(feature = "sh4")]
-    LdslAtRmIncFpul { rm: Reg },
+    LdslAtRmIncFpul { rm: Reg } = 187,
     #[cfg(feature = "sh3")]
-    PrefAtRn { rn: Reg },
+    PrefAtRn { rn: Reg } = 188,
     #[cfg(feature = "sh4")]
-    OcbiAtRn { rn: Reg },
+    OcbiAtRn { rn: Reg } = 189,
     #[cfg(feature = "sh4")]
-    OcbpAtRn { rn: Reg },
+    OcbpAtRn { rn: Reg } = 190,
     #[cfg(feature = "sh4")]
-    OcbwbAtRn { rn: Reg },
+    OcbwbAtRn { rn: Reg } = 191,
     #[cfg(feature = "sh4")]
-    FaddFrmFrn { frn: FReg, frm: FReg },
+    FaddFrmFrn { frn: FReg, frm: FReg } = 192,
     #[cfg(feature = "sh4")]
-    FsubFrmFrn { frn: FReg, frm: FReg },
+    FsubFrmFrn { frn: FReg, frm: FReg } = 193,
     #[cfg(feature = "sh4")]
-    FmulFrmFrn { frn: FReg, frm: FReg },
+    FmulFrmFrn { frn: FReg, frm: FReg } = 194,
     #[cfg(feature = "sh4")]
-    FdivFrmFrn { frn: FReg, frm: FReg },
+    FdivFrmFrn { frn: FReg, frm: FReg } = 195,
     #[cfg(feature = "sh4")]
-    FcmpeqFrmFrn { frn: FReg, frm: FReg },
+    FcmpeqFrmFrn { frn: FReg, frm: FReg } = 196,
     #[cfg(feature = "sh4")]
-    FcmpgtFrmFrn { frn: FReg, frm: FReg },
+    FcmpgtFrmFrn { frn: FReg, frm: FReg } = 197,
     #[cfg(feature = "sh4")]
-    FmovAtR0RmFrn { frn: FReg, rm: Reg },
+    FmovAtR0RmFrn { frn: FReg, rm: Reg } = 198,
     #[cfg(feature = "sh4")]
-    FmovFrmAtR0Rn { rn: Reg, frm: FReg },
+    FmovFrmAtR0Rn { rn: Reg, frm: FReg } = 199,
     #[cfg(feature = "sh4")]
-    FmovAtRmFrn { frn: FReg, rm: Reg },
+    FmovAtRmFrn { frn: FReg, rm: Reg } = 200,
     #[cfg(feature = "sh4")]
-    FmovAtRmIncFrn { frn: FReg, rm: Reg },
+    FmovAtRmIncFrn { frn: FReg, rm: Reg } = 201,
     #[cfg(feature = "sh4")]
-    FmovFrmAtRn { rn: Reg, frm: FReg },
+    FmovFrmAtRn { rn: Reg, frm: FReg } = 202,
     #[cfg(feature = "sh4")]
-    FmovFrmAtDecRn { rn: Reg, frm: FReg },
+    FmovFrmAtDecRn { rn: Reg, frm: FReg } = 203,
     #[cfg(feature = "sh4")]
-    FmovFrmFrn { frn: FReg, frm: FReg },
+    FmovFrmFrn { frn: FReg, frm: FReg } = 204,
     #[cfg(feature = "sh4")]
-    FstsFpulFrn { frn: FReg },
+    FstsFpulFrn { frn: FReg } = 205,
     #[cfg(feature = "sh4")]
-    FldsFrnFpul { frn: FReg },
+    FldsFrnFpul { frn: FReg } = 206,
     #[cfg(feature = "sh4")]
-    FloatFpulFrn { frn: FReg },
+    FloatFpulFrn { frn: FReg } = 207,
     #[cfg(feature = "sh4")]
-    FtrcFrnFpul { frn: FReg },
+    FtrcFrnFpul { frn: FReg } = 208,
     #[cfg(feature = "sh4")]
-    FnegFrn { frn: FReg },
+    FnegFrn { frn: FReg } = 209,
     #[cfg(feature = "sh4")]
-    FabsFrn { frn: FReg },
+    FabsFrn { frn: FReg } = 210,
     #[cfg(feature = "sh4")]
-    FsqrtFrn { frn: FReg },
+    FsqrtFrn { frn: FReg } = 211,
     #[cfg(feature = "sh4")]
-    Fldi0Frn { frn: FReg },
+    Fldi0Frn { frn: FReg } = 212,
     #[cfg(feature = "sh4")]
-    Fldi1Frn { frn: FReg },
+    Fldi1Frn { frn: FReg } = 213,
     #[cfg(feature = "sh4")]
-    FmacFr0FrmFrn { frn: FReg, frm: FReg },
+    FmacFr0FrmFrn { frn: FReg, frm: FReg } = 214,
     #[cfg(feature = "sh4")]
-    FcnvsdFpulDrn { drn: DReg },
+    FcnvsdFpulDrn { drn: DReg } = 215,
     #[cfg(feature = "sh4")]
-    FcnvdsDrnFpul { drn: DReg },
+    FcnvdsDrnFpul { drn: DReg } = 216,
     #[cfg(feature = "sh4")]
-    FiprFvmFvn { fvn: VecReg, fvm: VecReg },
+    FiprFvmFvn { fvn: VecReg, fvm: VecReg } = 217,
     #[cfg(feature = "sh4")]
-    FtrvXmtrxFvn { fvn: VecReg },
+    FtrvXmtrxFvn { fvn: VecReg } = 218,
     #[cfg(feature = "sh4")]
-    FsrraFrn { frn: FReg },
+    FsrraFrn { frn: FReg } = 219,
     #[cfg(feature = "sh4")]
-    FscaFpulDrn { drn: DReg },
+    FscaFpulDrn { drn: DReg } = 220,
     #[cfg(feature = "sh4")]
-    Fschg,
+    Fschg = 221,
     #[cfg(feature = "sh4")]
-    Frchg,
+    Frchg = 222,
     /// Raw 16-bit word (emitted when no instruction matches).
-    Word(u16),
+    Word(u16) = 223,
     /// Single raw data byte (emitted in [`ParseMode::Data`](crate::ParseMode)).
-    Byte(u8),
+    Byte(u8) = 224,
     /// Raw 32-bit data longword (emitted in [`ParseMode::Data`](crate::ParseMode)).
-    Long(u32),
+    Long(u32) = 225,
 }

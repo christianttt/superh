@@ -15,6 +15,7 @@ impl Ins {
             | Ins::Bsr { .. }
             | Ins::JmpAtRn { .. }
             | Ins::JsrAtRn { .. }
+            | Ins::Trapa { .. }
             | Ins::Rts
             | Ins::Rte => true,
             #[cfg(feature = "sh2")]

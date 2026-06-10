@@ -14,6 +14,7 @@
     clippy::match_same_arms,
     clippy::uninlined_format_args,
     clippy::doc_markdown,
+    clippy::collapsible_match,
 )]
 
 use crate::{BranchTarget, Ins, Options};

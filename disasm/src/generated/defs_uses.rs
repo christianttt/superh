@@ -14,6 +14,7 @@
     clippy::match_same_arms,
     clippy::uninlined_format_args,
     clippy::doc_markdown,
+    clippy::collapsible_match,
 )]
 
 use crate::{AnyReg, DefsUses, Ins};
@@ -354,7 +355,10 @@ impl Ins {
                 du.push(AnyReg::Sys(crate::SysReg::Pr));
             }
             Ins::Rts => {}
-            Ins::Rte => {}
+            Ins::Rte => {
+                du.push(AnyReg::Sys(crate::SysReg::Sr));
+                du.push(AnyReg::Sys(crate::SysReg::T));
+            }
             Ins::Clrmac => {
                 du.push(AnyReg::Sys(crate::SysReg::Mach));
                 du.push(AnyReg::Sys(crate::SysReg::Macl));
@@ -462,6 +466,7 @@ impl Ins {
             }
             Ins::LdcRmSr { .. } => {
                 du.push(AnyReg::Sys(crate::SysReg::Sr));
+                du.push(AnyReg::Sys(crate::SysReg::T));
             }
             Ins::LdcRmGbr { .. } => {
                 du.push(AnyReg::Sys(crate::SysReg::Gbr));
@@ -496,6 +501,7 @@ impl Ins {
             Ins::LdclAtRmIncSr { rm, .. } => {
                 du.push(AnyReg::Gp(*rm));
                 du.push(AnyReg::Sys(crate::SysReg::Sr));
+                du.push(AnyReg::Sys(crate::SysReg::T));
             }
             Ins::LdclAtRmIncGbr { rm, .. } => {
                 du.push(AnyReg::Gp(*rm));
@@ -1177,6 +1183,7 @@ impl Ins {
             Ins::Trapa { .. } => {}
             Ins::StcSrRn { .. } => {
                 du.push(AnyReg::Sys(crate::SysReg::Sr));
+                du.push(AnyReg::Sys(crate::SysReg::T));
             }
             Ins::StcGbrRn { .. } => {
                 du.push(AnyReg::Sys(crate::SysReg::Gbr));
@@ -1211,6 +1218,7 @@ impl Ins {
             Ins::StclSrAtDecRn { rn, .. } => {
                 du.push(AnyReg::Gp(*rn));
                 du.push(AnyReg::Sys(crate::SysReg::Sr));
+                du.push(AnyReg::Sys(crate::SysReg::T));
             }
             Ins::StclGbrAtDecRn { rn, .. } => {
                 du.push(AnyReg::Gp(*rn));

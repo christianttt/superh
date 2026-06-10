@@ -84,3 +84,42 @@ fn data_mode_little_endian_long() {
     let ins = p.next().unwrap();
     assert_eq!(ins, Ins::Long(0x12345678));
 }
+
+#[test]
+fn data_mode_alignment_follows_pc() {
+    // Buffer starts at offset 0 but the mapped address is ≡ 2 (mod 4):
+    // the split must follow the address — Word first, then an aligned Long.
+    let bytes = [0xaau8, 0xbb, 0x12, 0x34, 0x56, 0x78];
+    let mut p = Parser::new(&bytes, ParseMode::Data, ParseEndian::Big, opts());
+    p.set_pc(0x8c01_0002);
+    assert_eq!(p.next().unwrap(), Ins::Word(0xaabb));
+    assert_eq!(p.next().unwrap(), Ins::Long(0x12345678));
+    assert!(p.next().is_none());
+}
+
+// ─── Offset / PC navigation ──────────────────────────────────────────────────
+
+#[test]
+fn goto_offset_backward_rewinds_pc() {
+    let bytes = [0x00u8, 0x09, 0x00, 0x09]; // nop nop
+    let mut p = Parser::new(&bytes, ParseMode::Instruction, ParseEndian::Big, opts());
+    p.set_pc(0x1000);
+    p.next();
+    p.next();
+    assert_eq!((p.offset(), p.pc()), (4, 0x1004));
+    p.goto_offset(0);
+    assert_eq!((p.offset(), p.pc()), (0, 0x1000));
+}
+
+#[test]
+fn jump_clamps_to_buffer_and_keeps_pc_in_sync() {
+    let bytes = [0x00u8, 0x09, 0x00, 0x09];
+    let mut p = Parser::new(&bytes, ParseMode::Instruction, ParseEndian::Big, opts());
+    p.set_pc(0x1000);
+    p.jump(-100); // clamps at the start; PC must not move
+    assert_eq!((p.offset(), p.pc()), (0, 0x1000));
+    p.jump(100); // clamps at the end; PC advances by the clamped delta
+    assert_eq!((p.offset(), p.pc()), (4, 0x1004));
+    p.jump(-2);
+    assert_eq!((p.offset(), p.pc()), (2, 0x1002));
+}

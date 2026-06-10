@@ -2,6 +2,7 @@ use crate::isa::{FieldType, Isa, Opcode, SHVersion};
 use crate::util::hex_literal::HexLiteral;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use std::collections::BTreeMap;
 
 pub fn generate_parse(isa: &Isa) -> TokenStream {
     // Group instructions by top nibble (bits 15..12)
@@ -58,16 +59,72 @@ pub fn generate_parse(isa: &Isa) -> TokenStream {
 
 fn gen_group_fn(nibble: usize, ops: &[&Opcode]) -> TokenStream {
     let fn_name = format_ident!("parse_group{:x}", nibble);
-    let checks: Vec<TokenStream> = ops.iter().map(|op| gen_op_check(op)).collect();
+
+    // Bits below the top nibble that are fixed in every opcode in this group.
+    // If non-zero and the group is large enough to benefit, use a match on those
+    // bits instead of a flat if-chain to give LLVM a bounded candidate set per arm.
+    let discriminator = common_fixed_mask(ops);
+
+    let body = if discriminator != 0 && ops.len() > 3 {
+        gen_match_dispatch(ops, discriminator)
+    } else {
+        let checks: Vec<TokenStream> = ops.iter().map(|op| gen_op_check(op)).collect();
+        quote! { #(#checks)* Ins::Word(ins) }
+    };
 
     quote! {
         #[inline]
         fn #fn_name(ins: u16, pc: u32, opts: &Options) -> Ins {
             let _ = pc; // may be unused if no PC-relative ops in this group
             let _ = opts; // may be unused if all instructions in group are sh1
-            #(#checks)*
-            Ins::Word(ins)
+            #body
         }
+    }
+}
+
+/// Returns the intersection of the fixed bits (below bit 12) across every opcode.
+/// These are the bits safe to use as a jump-table key: because common_mask ⊆ op.mask
+/// for every op, an instruction can only reach a bucket if it satisfies the op's
+/// constraint at those positions — no false negatives are possible.
+fn common_fixed_mask(ops: &[&Opcode]) -> u16 {
+    ops.iter().fold(0x0fff_u16, |acc, op| {
+        let (mask, _) = op.mask_value();
+        acc & mask & 0x0fff
+    })
+}
+
+/// Emit `match ins & discriminator { key => { inner_checks }, ... _ => {} } Ins::Word(ins)`.
+/// Opcodes are bucketed by (op.value & discriminator); each arm only checks the small
+/// subset of ops whose fixed bits agree with that key value.
+fn gen_match_dispatch(ops: &[&Opcode], discriminator: u16) -> TokenStream {
+    let mut buckets: BTreeMap<u16, Vec<&Opcode>> = BTreeMap::new();
+    for op in ops {
+        let (_, value) = op.mask_value();
+        buckets.entry(value & discriminator).or_default().push(op);
+    }
+
+    let disc_lit = HexLiteral(discriminator);
+
+    let arms: Vec<TokenStream> = buckets
+        .iter()
+        .map(|(key, bucket_ops)| {
+            let key_lit = HexLiteral(*key);
+            // gen_op_check still emits the full (ins & mask) == value guard — the
+            // discriminator bits are rechecked, but LLVM folds that away since the
+            // match arm already constrains them.
+            let checks: Vec<TokenStream> = bucket_ops.iter().map(|op| gen_op_check(op)).collect();
+            quote! {
+                #key_lit => { #(#checks)* }
+            }
+        })
+        .collect();
+
+    quote! {
+        match ins & #disc_lit {
+            #(#arms,)*
+            _ => {}
+        }
+        Ins::Word(ins)
     }
 }
 
