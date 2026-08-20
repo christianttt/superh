@@ -1,20 +1,24 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
-use super::types::{FieldType, SHVersion};
+use super::types::{Architecture, FieldType};
 
 /// A single instruction encoding entry
 #[derive(Debug, Deserialize)]
 #[allow(clippy::struct_field_names)]
 pub struct Opcode {
+    /// Stable public opcode ID. IDs are never reused after an entry is removed.
+    pub id: u16,
     /// Rust enum variant name (`PascalCase`), e.g. `MovRmRn`
     pub name: String,
     /// Display mnemonic, e.g. "mov", "mov.b", "cmp/eq"
     pub opcode: String,
     /// Format string for operands, e.g. "{rm}, {rn}" or "@{rm}, {rn}"
     pub args: String,
-    /// Minimum SH version: sh1 | sh2 | sh3 | sh4
-    pub version: SHVersion,
+    /// Architectures on which this exact encoding is defined.
+    pub architectures: Vec<Architecture>,
+    /// Manual/section citation for the encoding and semantics audit.
+    pub source: String,
     /// 16-character bit pattern (0/1 = fixed bits; n/m/d/i/b = field bits)
     pub pattern: String,
     /// Type declaration for each unique letter in the pattern
@@ -62,11 +66,10 @@ impl Opcode {
     ///
     /// Panics at code-generation time if the field bits are not contiguous.
     pub fn field_bits(&self, letter: char) -> Option<(u8, u8)> {
-        let chars: Vec<char> = self.pattern.chars().collect();
         let mut high: Option<u8> = None;
         let mut low: Option<u8> = None;
         let mut count: usize = 0;
-        for (i, &ch) in chars.iter().enumerate() {
+        for (i, ch) in self.pattern.chars().enumerate() {
             if ch == letter {
                 #[allow(clippy::cast_possible_truncation)]
                 let bit = (15 - i) as u8;

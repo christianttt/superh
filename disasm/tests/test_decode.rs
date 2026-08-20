@@ -1,424 +1,312 @@
-use superh::{BranchTarget, Ins, Options, Reg, parse, parse_with_discriminant};
+use superh::{
+    Address, Architecture, BranchDisp8, BranchDisp12, DecodeOptions, DecodeResult, Disp, FormatIns,
+    FormatOptions, ImmediateRadix, Ins, Opcode, OpcodeId, Reg, StringFormatter, decode,
+};
 
-fn opts() -> Options {
-    Options::default()
+fn options(architecture: Architecture) -> DecodeOptions {
+    DecodeOptions::new(architecture)
 }
 
-fn dis(word: u16) -> String {
-    let ins = parse(word, 0, &opts());
-    format!("{}", ins.display(&opts()))
+fn instruction(word: u16, architecture: Architecture) -> Ins {
+    decode(word, &options(architecture)).instruction().copied().expect("known instruction")
 }
 
-// ─── Data Transfer ───────────────────────────────────────────────────────────
+fn assert_copy<T: Copy>() {}
 
 #[test]
-fn mov_rm_rn() {
-    // mov r2, r3  →  0110 0011 0010 0011  =  0x6323
-    let ins = parse(0x6323, 0, &opts());
-    assert_eq!(ins, Ins::MovRmRn { rn: Reg::R3, rm: Reg::R2 });
-    assert_eq!(dis(0x6323), "mov r2, r3");
-}
-
-#[test]
-fn mov_imm_rn() {
-    // mov #1, r0  →  1110 0000 0000 0001  =  0xe001
-    let ins = parse(0xe001, 0, &opts());
-    assert_eq!(ins, Ins::MovImmRn { rn: Reg::R0, imm: 1 });
-    assert_eq!(dis(0xe001), "mov #0x1, r0");
+fn decodes_valid_instruction_without_location() {
+    let instruction = instruction(0x6323, Architecture::default());
+    assert_eq!(instruction, Ins::MovRmRn { rn: Reg::R3, rm: Reg::R2 });
+    assert_eq!(instruction.opcode(), Opcode::MovRmRn);
+    assert_eq!(instruction.encode(), Some(0x6323));
 }
 
 #[test]
-fn mov_neg_imm_rn() {
-    // mov #-1, r0  →  1110 0000 1111 1111  =  0xe0ff
-    let ins = parse(0xe0ff, 0, &opts());
-    assert_eq!(ins, Ins::MovImmRn { rn: Reg::R0, imm: -1i8 });
-    assert_eq!(dis(0xe0ff), "mov #-0x1, r0");
+fn decoded_values_are_copy_and_compact() {
+    assert_copy::<Ins>();
+    assert_copy::<DecodeResult>();
+    assert_eq!(core::mem::size_of::<Ins>(), 4);
+    assert_eq!(core::mem::size_of::<DecodeResult>(), 4);
 }
 
 #[test]
-fn movb_rm_at_rn() {
-    // mov.b r1, @r2  →  0010 0010 0001 0000  =  0x2210
-    assert_eq!(dis(0x2210), "mov.b r1, @r2");
+fn preserves_raw_pc_relative_displacement() {
+    let a = instruction(0xd001, Architecture::default());
+    let b = instruction(0xd001, Architecture::default());
+    assert_eq!(a, b);
+    let Ins::MovlAtDispPcRn { disp, .. } = a else { panic!("wrong opcode") };
+    assert_eq!(disp.value(), 1);
 }
 
 #[test]
-fn movl_at_rm_rn() {
-    // mov.l @r4, r5  →  0110 0101 0100 0010  =  0x6542
-    let ins = parse(0x6542, 0, &opts());
-    assert_eq!(ins, Ins::MovlAtRmRn { rn: Reg::R5, rm: Reg::R4 });
+fn reports_unknown_word_separately() {
+    assert_eq!(decode(0xffff, &options(Architecture::default())), DecodeResult::Unknown(0xffff));
 }
 
 #[test]
-fn movb_r0_at_disp_rn() {
-    // mov.b r0, @(2, r1)  →  1000 0000 0001 0010  =  0x8012
-    assert_eq!(dis(0x8012), "mov.b r0, @(0x2, r1)");
+fn stable_opcode_ids_round_trip() {
+    let instruction = instruction(0x6323, Architecture::default());
+    let id = instruction.opcode().id();
+    assert_eq!(id.value(), 0);
+    assert_eq!(Opcode::from_id(id), Some(Opcode::MovRmRn));
+    assert_eq!(Opcode::from_id(OpcodeId::new(u16::MAX)), None);
 }
 
 #[test]
-fn movl_rm_at_disp_rn() {
-    // mov.l r2, @(12, r3)  →  0001 0011 0010 0011  =  0x1323
-    assert_eq!(dis(0x1323), "mov.l r2, @(0xc, r3)");
+fn location_aware_display_resolves_pc_relative_address() {
+    let instruction = instruction(0xd001, Architecture::default());
+    assert_eq!(
+        instruction.at(0x1002).display(&FormatOptions::default()).to_string(),
+        "mov.l @(0x1008, pc), r0"
+    );
 }
 
 #[test]
-fn movl_at_disp_rm_rn() {
-    // mov.l @(4, r1), r0  →  0101 0000 0001 0001  =  0x5011
-    assert_eq!(dis(0x5011), "mov.l @(0x4, r1), r0");
+fn formatting_options_do_not_affect_decode() {
+    let instruction = instruction(0xe0ff, Architecture::default());
+    let decimal = FormatOptions::new(ImmediateRadix::Decimal);
+    assert_eq!(instruction.at(0).display(&decimal).to_string(), "mov #-1, r0");
+    assert_eq!(instruction.at(0).display(&FormatOptions::default()).to_string(), "mov #-0x1, r0");
 }
 
 #[test]
-fn movb_at_rm_inc_rn() {
-    // mov.b @r0+, r1  →  0110 0001 0000 0100  =  0x6104
-    assert_eq!(dis(0x6104), "mov.b @r0+, r1");
+fn signed_formatter_handles_the_full_i32_range() {
+    let mut formatter = StringFormatter::new(FormatOptions::default());
+    formatter.write_simm(i32::MIN).expect("string formatting");
+    assert_eq!(formatter.into_string(), "-0x80000000");
 }
 
 #[test]
-fn mova() {
-    // mova @(0x4, pc), r0  =  0xc700 (raw disp=0, display offset = 0*4+4-(pc&3) = 4)
-    let ins = parse(0xc700, 0, &opts());
-    assert_eq!(ins, Ins::Mova { disp: 4 });
+fn decode_results_support_reusable_formatting_buffers() {
+    let options = FormatOptions::default();
+    let mut formatter = StringFormatter::new(options);
+
+    let instruction = decode(0x6323, &DecodeOptions::default());
+    instruction.write_at(&mut formatter, 0x1000).expect("format instruction");
+    assert_eq!(formatter.as_str(), "mov r2, r3");
+
+    formatter.clear();
+    let unknown = DecodeResult::Unknown(0xffff);
+    unknown.write_at(&mut formatter, 0x1002).expect("format unknown word");
+    assert_eq!(formatter.as_str(), ".word 0xffff");
 }
 
 #[test]
-fn movt() {
-    // movt r4  →  0000 0100 0010 1001  =  0x0429
-    let ins = parse(0x0429, 0, &opts());
-    assert_eq!(ins, Ins::Movt { rn: Reg::R4 });
-    assert_eq!(dis(0x0429), "movt r4");
+fn public_operand_construction_preserves_valid_ranges() {
+    assert_eq!(Reg::from_number(15), Some(Reg::R15));
+    assert_eq!(Reg::from_number(16), None);
+    assert_eq!(Disp::new(0xab), Disp::from(0xab));
+    assert_eq!(BranchDisp8::new(-128), BranchDisp8::from(-128));
+    assert_eq!(BranchDisp12::new(-2048).expect("lower bound").value(), -2048);
+    assert_eq!(BranchDisp12::new(2047).expect("upper bound").value(), 2047);
+    assert_eq!(BranchDisp12::new(-2049), None);
+    assert_eq!(BranchDisp12::new(2048), None);
+    assert_eq!(u32::from(Address::from(0x8c01_0000)), 0x8c01_0000);
 }
 
 #[test]
-fn swap_b() {
-    // swap.b r1, r2  →  0110 0010 0001 1000  =  0x6218
-    assert_eq!(dis(0x6218), "swap.b r1, r2");
+fn decode_is_available_in_const_contexts() {
+    const OPTIONS: DecodeOptions = DecodeOptions::new(Architecture::Sh1);
+    const RESULT: DecodeResult = decode(0x0009, &OPTIONS);
+    const KNOWN_RESULT: Option<Ins> = Opcode::Nop.decode(0x0009, &OPTIONS);
+    const ENCODED: Option<u16> = Ins::Nop.encode();
+    assert_eq!(RESULT.instruction().map(Ins::opcode), Some(Opcode::Nop));
+    assert_eq!(KNOWN_RESULT, RESULT.instruction().copied());
+    assert_eq!(ENCODED, Some(0x0009));
 }
 
-// ─── PC-relative addressing ───────────────────────────────────────────────────
-
+#[cfg(feature = "sh3")]
 #[test]
-fn movl_at_disp_pc_rn_aligned() {
-    // mov.l @(d=1, pc), r0  at pc=0x1000 (4-byte aligned)
-    // EA = 1*4 + (0x1000 & !3) + 4 = 0x1008; display_offset = 8
-    let ins = parse(0xd001, 0x1000, &opts());
-    assert_eq!(ins, Ins::MovlAtDispPcRn { rn: Reg::R0, disp: 8 });
-    assert_eq!(format!("{}", ins.display(&opts())), "mov.l @(0x8, pc), r0");
+fn banked_register_construction_validates_its_range() {
+    use superh::BankReg;
+
+    assert_eq!(BankReg::from_number(7).expect("upper bound").number(), 7);
+    assert_eq!(BankReg::from_number(8), None);
 }
 
+#[cfg(feature = "sh4")]
 #[test]
-fn movl_at_disp_pc_rn_unaligned() {
-    // mov.l @(d=1, pc), r0  at pc=0x1002 (not 4-byte aligned)
-    // EA = 1*4 + (0x1002 & !3) + 4 = 0x1008; display_offset = 6
-    let ins = parse(0xd001, 0x1002, &opts());
-    assert_eq!(ins, Ins::MovlAtDispPcRn { rn: Reg::R0, disp: 6 });
-    assert_eq!(format!("{}", ins.display(&opts())), "mov.l @(0x6, pc), r0");
-}
+fn floating_register_construction_validates_architectural_numbers() {
+    use superh::{DReg, FReg, VecReg};
 
-#[test]
-fn movw_at_disp_pc_rn_no_alignment() {
-    // mov.w @(d=1, pc), r0 — no alignment correction regardless of PC
-    // display_offset = d*2 + 4 = 6 always
-    let ins_a = parse(0x9001, 0x0000, &opts());
-    let ins_b = parse(0x9001, 0x1002, &opts());
-    assert_eq!(ins_a, Ins::MovwAtDispPcRn { rn: Reg::R0, disp: 1 });
-    assert_eq!(format!("{}", ins_a.display(&opts())), "mov.w @(0x6, pc), r0");
-    assert_eq!(format!("{}", ins_b.display(&opts())), "mov.w @(0x6, pc), r0");
+    assert_eq!(FReg::from_number(15), Some(FReg::Fr15));
+    assert_eq!(FReg::from_number(16), None);
+    assert_eq!(DReg::from_number(14), Some(DReg::Dr14));
+    assert_eq!(DReg::from_number(3), None);
+    assert_eq!(VecReg::from_number(12), Some(VecReg::Fv12));
+    assert_eq!(VecReg::from_number(6), None);
 }
 
 #[test]
-fn mova_unaligned_pc() {
-    // mova @(d=0, pc), r0  at pc=0x1002 (not 4-byte aligned)
-    // EA = 0*4 + (0x1002 & !3) + 4 = 0x1004; display_offset = 2
-    let ins = parse(0xc700, 0x1002, &opts());
-    assert_eq!(ins, Ins::Mova { disp: 2 });
-    assert_eq!(format!("{}", ins.display(&opts())), "mova @(0x2, pc), r0");
+fn representative_manual_encodings_decode() {
+    let cases = [
+        (0x0009, "nop"),
+        (0x321c, "add r1, r2"),
+        (0xc320, "trapa #0x20"),
+        (0x4e2b, "jmp @r14"),
+        (0x000b, "rts"),
+    ];
+    for (word, expected) in cases {
+        let instruction = instruction(word, Architecture::default());
+        assert_eq!(instruction.at(0).display(&FormatOptions::default()).to_string(), expected);
+    }
 }
 
-// ─── Arithmetic ──────────────────────────────────────────────────────────────
-
+#[cfg(feature = "sh4")]
 #[test]
-fn add_rm_rn() {
-    // add r1, r2  →  0011 0010 0001 1100  =  0x321c
-    let ins = parse(0x321c, 0, &opts());
-    assert_eq!(ins, Ins::AddRmRn { rn: Reg::R2, rm: Reg::R1 });
-    assert_eq!(dis(0x321c), "add r1, r2");
+fn sh4_fmov_mnemonic_distinguishes_memory_and_register_forms() {
+    let cases = [
+        (0xf3e6, "fmov.s @(r0, r14), fr3"),
+        (0xf3e8, "fmov.s @r14, fr3"),
+        (0xf3e9, "fmov.s @r14+, fr3"),
+        (0xf3e7, "fmov.s fr14, @(r0, r3)"),
+        (0xf3ea, "fmov.s fr14, @r3"),
+        (0xf3eb, "fmov.s fr14, @-r3"),
+        (0xf3ec, "fmov fr14, fr3"),
+    ];
+    for (word, expected) in cases {
+        let instruction = instruction(word, Architecture::Sh4);
+        assert_eq!(instruction.at(0).display(&FormatOptions::default()).to_string(), expected);
+    }
 }
 
+#[cfg(feature = "sh2")]
 #[test]
-fn add_imm_rn() {
-    // add #4, r0  →  0111 0000 0000 0100  =  0x7004
-    assert_eq!(dis(0x7004), "add #0x4, r0");
-}
-
-#[test]
-fn cmp_eq_imm() {
-    // cmp/eq #0, r0  →  1000 1000 0000 0000  =  0x8800
-    assert_eq!(dis(0x8800), "cmp/eq #0x0, r0");
-}
-
-#[test]
-fn cmp_eq_rm_rn() {
-    // cmp/eq r3, r4  →  0011 0100 0011 0000  =  0x3430
-    assert_eq!(dis(0x3430), "cmp/eq r3, r4");
-}
-
-#[test]
-fn neg() {
-    // neg r1, r2  →  0110 0010 0001 1011  =  0x621b
-    assert_eq!(dis(0x621b), "neg r1, r2");
-}
-
-#[test]
-fn exts_b() {
-    // exts.b r0, r1  →  0110 0001 0000 1110  =  0x610e
-    assert_eq!(dis(0x610e), "exts.b r0, r1");
-}
-
-// ─── Logic ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn and_rm_rn() {
-    // and r2, r3  →  0010 0011 0010 1001  =  0x2329
-    assert_eq!(dis(0x2329), "and r2, r3");
-}
-
-#[test]
-fn or_imm_r0() {
-    // or #0xff, r0  →  1100 1011 1111 1111  =  0xcbff
-    assert_eq!(dis(0xcbff), "or #0xff, r0");
-}
-
-#[test]
-fn xor_rm_rn() {
-    // xor r5, r6  →  0010 0110 0101 1010  =  0x265a
-    assert_eq!(dis(0x265a), "xor r5, r6");
-}
-
-#[test]
-fn tst_imm_r0() {
-    // tst #1, r0  →  1100 1000 0000 0001  =  0xc801
-    assert_eq!(dis(0xc801), "tst #0x1, r0");
-}
-
-// ─── Shift / Rotate ──────────────────────────────────────────────────────────
-
-#[test]
-fn shll() {
-    // shll r0  →  0100 0000 0000 0000  =  0x4000
-    let ins = parse(0x4000, 0, &opts());
-    assert_eq!(ins, Ins::ShllRn { rn: Reg::R0 });
-    assert_eq!(dis(0x4000), "shll r0");
-}
-
-#[test]
-fn shlr16() {
-    // shlr16 r3  →  0100 0011 0010 1001  =  0x4329
-    assert_eq!(dis(0x4329), "shlr16 r3");
-}
-
-#[test]
-fn rotcl() {
-    // rotcl r5  →  0100 0101 0010 0100  =  0x4524
-    assert_eq!(dis(0x4524), "rotcl r5");
-}
-
-// ─── Branch ──────────────────────────────────────────────────────────────────
-
-#[test]
-fn bt() {
-    // bt +8  →  1000 1001 0000 0011  =  0x8903  (disp=3 → offset=3*2+4=10)
-    let ins = parse(0x8903, 0, &opts());
-    assert_eq!(ins, Ins::Bt { disp: BranchTarget { addr: 10 } });
-    assert_eq!(dis(0x8903), "bt 0xa");
-}
-
-#[test]
-fn bf() {
-    // bf .+0  →  1000 1011 1111 1110  =  0x8bfe  (disp=-2 → offset=-2*2+4=0)
-    let ins = parse(0x8bfe, 0, &opts());
-    assert_eq!(ins, Ins::Bf { disp: BranchTarget { addr: 0 } });
-}
-
-#[test]
-fn bra() {
-    // bra .+4  →  1010 0000 0000 0000  =  0xa000  (disp=0 → 0*2+4=4)
-    let ins = parse(0xa000, 0, &opts());
-    assert_eq!(ins, Ins::Bra { disp: BranchTarget { addr: 4 } });
-    assert_eq!(dis(0xa000), "bra 0x4");
-}
-
-#[test]
-fn jmp() {
-    // jmp @r14  →  0100 1110 0010 1011  =  0x4e2b
-    let ins = parse(0x4e2b, 0, &opts());
-    assert_eq!(ins, Ins::JmpAtRn { rn: Reg::R14 });
-    assert_eq!(dis(0x4e2b), "jmp @r14");
-}
-
-#[test]
-fn jsr() {
-    // jsr @r0  →  0100 0000 0000 1011  =  0x400b
-    assert_eq!(dis(0x400b), "jsr @r0");
-}
-
-#[test]
-fn rts() {
-    // rts  →  0000 0000 0000 1011  =  0x000b
-    let ins = parse(0x000b, 0, &opts());
-    assert_eq!(ins, Ins::Rts);
-    assert_eq!(dis(0x000b), "rts");
-}
-
-#[test]
-fn rte() {
-    // rte  →  0000 0000 0010 1011  =  0x002b
-    let ins = parse(0x002b, 0, &opts());
-    assert_eq!(ins, Ins::Rte);
-    assert_eq!(dis(0x002b), "rte");
-}
-
-// ─── System ──────────────────────────────────────────────────────────────────
-
-#[test]
-fn nop() {
-    // nop  →  0000 0000 0000 1001  =  0x0009
-    let ins = parse(0x0009, 0, &opts());
-    assert_eq!(ins, Ins::Nop);
-    assert_eq!(dis(0x0009), "nop");
-}
-
-#[test]
-fn clrt() {
-    // clrt  →  0000 0000 0000 1000  =  0x0008
-    let ins = parse(0x0008, 0, &opts());
-    assert_eq!(ins, Ins::Clrt);
-}
-
-#[test]
-fn sett() {
-    // sett  →  0000 0000 0001 1000  =  0x0018
-    let ins = parse(0x0018, 0, &opts());
-    assert_eq!(ins, Ins::Sett);
-}
-
-#[test]
-fn trapa() {
-    // trapa #0x20  →  1100 0011 0010 0000  =  0xc320
-    let ins = parse(0xc320, 0, &opts());
-    assert_eq!(ins, Ins::Trapa { imm: 0x20 });
-    assert_eq!(dis(0xc320), "trapa #0x20");
-}
-
-#[test]
-fn stc_sr_rn() {
-    // stc sr, r0  →  0000 0000 0000 0010  =  0x0002
-    let ins = parse(0x0002, 0, &opts());
-    assert_eq!(ins, Ins::StcSrRn { rn: Reg::R0 });
-    assert_eq!(dis(0x0002), "stc sr, r0");
-}
-
-#[test]
-fn sts_pr_rn() {
-    // sts pr, r14  →  0000 1110 0010 1010  =  0x0e2a
-    let ins = parse(0x0e2a, 0, &opts());
-    assert_eq!(ins, Ins::StsPrRn { rn: Reg::R14 });
-    assert_eq!(dis(0x0e2a), "sts pr, r14");
-}
-
-#[test]
-fn lds_rm_pr() {
-    // lds r14, pr  →  0100 1110 0010 1010  =  0x4e2a
-    let ins = parse(0x4e2a, 0, &opts());
-    assert_eq!(ins, Ins::LdsRmPr { rm: Reg::R14 });
-    assert_eq!(dis(0x4e2a), "lds r14, pr");
-}
-
-#[test]
-fn stsl_pr_at_dec_rn() {
-    // sts.l pr, @-r15  →  0100 1111 0010 0010  =  0x4f22
-    let ins = parse(0x4f22, 0, &opts());
-    assert_eq!(ins, Ins::StslPrAtDecRn { rn: Reg::R15 });
-    assert_eq!(dis(0x4f22), "sts.l pr, @-r15");
-}
-
-#[test]
-fn ldsl_at_rm_inc_pr() {
-    // lds.l @r15+, pr  →  0100 1111 0010 0110  =  0x4f26
-    let ins = parse(0x4f26, 0, &opts());
-    assert_eq!(ins, Ins::LdslAtRmIncPr { rm: Reg::R15 });
-    assert_eq!(dis(0x4f26), "lds.l @r15+, pr");
-}
-
-// ─── Unknown encoding ────────────────────────────────────────────────────────
-
-#[test]
-fn unknown_word() {
-    let ins = parse(0xffff, 0, &opts());
-    assert_eq!(ins, Ins::Word(0xffff));
-    assert_eq!(dis(0xffff), ".word 0xffff");
-}
-
-// ─── parse_with_discriminant ─────────────────────────────────────────────────
-
-#[test]
-fn parse_with_discriminant_roundtrip() {
-    // Every recognised instruction word must round-trip: re-parsing with its
-    // own discriminant must produce the same Ins value.
-    let opts = opts();
-    for word in 0u16..=0xffff {
-        let ins = parse(word, 0, &opts);
-        let disc = ins.discriminant();
-        let again = parse_with_discriminant(word, disc, 0, &opts);
-        assert_eq!(ins, again, "round-trip failed for word 0x{word:04x}");
+fn delayed_conditional_branches_use_manual_mnemonics() {
+    let cases = [(0x8d00, "bt/s 0x4"), (0x8f00, "bf/s 0x4")];
+    for (word, expected) in cases {
+        let instruction = instruction(word, Architecture::Sh2);
+        assert_eq!(instruction.at(0).display(&FormatOptions::default()).to_string(), expected);
     }
 }
 
 #[test]
-fn parse_with_discriminant_unknown_falls_back() {
-    // An out-of-range discriminant must return Ins::Word.
-    let opts = opts();
-    let result = parse_with_discriminant(0x6323, 0xffff, 0, &opts);
-    assert_eq!(result, Ins::Word(0x6323));
-}
-
-// ─── imm_decimal option ───────────────────────────────────────────────────────
-
-#[test]
-fn imm_decimal_uimm() {
-    // add #8, r3 — uimm displayed as decimal
-    let opts = Options { imm_decimal: true, ..Options::default() };
-    let ins = parse(0x7308, 0, &opts);
-    assert_eq!(format!("{}", ins.display(&opts)), "add #8, r3");
+fn every_word_has_deterministic_opcode_identity() {
+    let options = options(Architecture::default());
+    for word in 0u16..=u16::MAX {
+        let first = decode(word, &options);
+        let second = decode(word, &options);
+        assert_eq!(first, second, "word 0x{word:04x}");
+        if let DecodeResult::Instruction(instruction) = first {
+            let opcode = instruction.opcode();
+            assert_eq!(Opcode::from_id(opcode.id()), Some(opcode));
+        }
+    }
 }
 
 #[test]
-fn imm_decimal_simm() {
-    // mov #100, r0
-    let opts = Options { imm_decimal: true, ..Options::default() };
-    let ins = parse(0xe064, 0, &opts);
-    assert_eq!(format!("{}", ins.display(&opts)), "mov #100, r0");
+fn known_opcode_decode_matches_full_decode_for_every_valid_word() {
+    let architectures = [
+        #[cfg(feature = "sh1")]
+        Architecture::Sh1,
+        #[cfg(feature = "sh2")]
+        Architecture::Sh2,
+        #[cfg(feature = "sh3")]
+        Architecture::Sh3,
+        #[cfg(feature = "sh4")]
+        Architecture::Sh4,
+    ];
+
+    for architecture in architectures {
+        let options = options(architecture);
+        for word in 0u16..=u16::MAX {
+            let decoded = decode(word, &options);
+            if let DecodeResult::Instruction(instruction) = decoded {
+                assert_eq!(
+                    instruction.opcode().decode(word, &options),
+                    Some(instruction),
+                    "word 0x{word:04x} on {architecture:?}"
+                );
+            }
+        }
+    }
 }
 
 #[test]
-fn imm_decimal_negative() {
-    // mov #-1, r0  (0xe0ff)
-    let opts = Options { imm_decimal: true, ..Options::default() };
-    let ins = parse(0xe0ff, 0, &opts);
-    assert_eq!(format!("{}", ins.display(&opts)), "mov #-1, r0");
+fn every_valid_encoding_round_trips_exactly() {
+    let architectures = [
+        #[cfg(feature = "sh1")]
+        Architecture::Sh1,
+        #[cfg(feature = "sh2")]
+        Architecture::Sh2,
+        #[cfg(feature = "sh3")]
+        Architecture::Sh3,
+        #[cfg(feature = "sh4")]
+        Architecture::Sh4,
+    ];
+
+    for architecture in architectures {
+        let options = options(architecture);
+        for word in 0u16..=u16::MAX {
+            let decoded = decode(word, &options);
+            if let DecodeResult::Instruction(instruction) = decoded {
+                let encoded = instruction.encode().expect("decoded operands fit their encoding");
+                assert_eq!(encoded, word, "word 0x{word:04x} on {architecture:?}");
+                assert_eq!(decode(encoded, &options), decoded);
+            }
+        }
+    }
 }
 
 #[test]
-fn imm_hex_default() {
-    // Default: hex output unchanged
-    let ins = parse(0xe064, 0, &opts());
-    assert_eq!(format!("{}", ins.display(&opts())), "mov #0x64, r0");
+fn encode_rejects_a_displacement_that_exceeds_its_field() {
+    let invalid = Ins::MovbR0AtDispRn { rn: Reg::R0, disp: Disp::new(0x10) };
+    assert_eq!(invalid.encode(), None);
+
+    let valid = Ins::MovbR0AtDispRn { rn: Reg::R0, disp: Disp::new(0x0f) };
+    assert_eq!(valid.encode(), Some(0x800f));
+
+    let wide = Ins::Mova { disp: Disp::new(0xff) };
+    assert_eq!(wide.encode(), Some(0xc7ff));
 }
 
 #[test]
-fn parse_with_discriminant_specific() {
-    // mov r2, r3 (0x6323) → MovRmRn; discriminant must restore it.
-    let opts = opts();
-    let ins = parse(0x6323, 0, &opts);
-    let disc = ins.discriminant();
-    let again = parse_with_discriminant(0x6323, disc, 0, &opts);
-    assert_eq!(again, Ins::MovRmRn { rn: Reg::R3, rm: Reg::R2 });
+fn known_opcode_decode_rejects_a_mismatched_word() {
+    let options = options(Architecture::default());
+    assert_eq!(Opcode::Nop.decode(0x6323, &options), None);
+}
+
+#[cfg(all(feature = "sh1", feature = "sh4"))]
+#[test]
+fn known_opcode_decode_rejects_an_unavailable_architecture() {
+    let word = 0xf3ec;
+    assert!(matches!(
+        decode(word, &options(Architecture::Sh4)),
+        DecodeResult::Instruction(Ins::FmovFrmFrn { .. })
+    ));
+    assert_eq!(Opcode::FmovFrmFrn.decode(word, &options(Architecture::Sh1)), None);
+}
+
+#[test]
+fn every_available_opcode_is_reachable_and_filtered_by_architecture() {
+    let architectures = [
+        #[cfg(feature = "sh1")]
+        Architecture::Sh1,
+        #[cfg(feature = "sh2")]
+        Architecture::Sh2,
+        #[cfg(feature = "sh3")]
+        Architecture::Sh3,
+        #[cfg(feature = "sh4")]
+        Architecture::Sh4,
+    ];
+
+    for architecture in architectures {
+        let options = options(architecture);
+        let mut reached = vec![false; usize::from(u16::MAX) + 1];
+        for word in 0u16..=u16::MAX {
+            if let DecodeResult::Instruction(instruction) = decode(word, &options) {
+                let opcode = instruction.opcode();
+                assert!(opcode.architectures().contains(architecture));
+                reached[usize::from(opcode.id().value())] = true;
+            }
+        }
+        for raw_id in 0u16..=u16::MAX {
+            let Some(opcode) = Opcode::from_id(OpcodeId::new(raw_id)) else { continue };
+            assert_eq!(
+                reached[usize::from(raw_id)],
+                opcode.architectures().contains(architecture),
+                "opcode {opcode:?} on {architecture:?}"
+            );
+        }
+    }
 }

@@ -1,5 +1,6 @@
-mod defs_uses;
 mod display;
+mod effects;
+mod encode;
 mod parse;
 mod types;
 
@@ -16,7 +17,10 @@ impl Isa {
     pub fn generate_display(&self) -> TokenStream {
         display::generate_display(self)
     }
-    pub fn generate_defs_uses(&self) -> TokenStream {
-        defs_uses::generate_defs_uses(self)
+    pub fn generate_encode(&self) -> TokenStream {
+        encode::generate_encode(self)
+    }
+    pub fn generate_effects(&self) -> TokenStream {
+        effects::generate_effects(self)
     }
 }

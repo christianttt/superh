@@ -17,389 +17,388 @@
     clippy::collapsible_match,
 )]
 
-use crate::{BranchTarget, Ins, Options};
+use crate::{Address, Disp, FormatOptions, ImmediateRadix, Ins, Reg};
+#[cfg(feature = "sh3")]
+use crate::BankReg;
 #[cfg(feature = "sh4")]
 use crate::{DReg, FReg, VecReg};
-use crate::Reg;
+/// Structured instruction formatting callbacks.
 pub trait FormatIns: core::fmt::Write {
-    fn options(&self) -> &Options;
+    /// Return rendering-only options.
+    fn options(&self) -> &FormatOptions;
+    /// Write the gap between mnemonic and operands.
     fn write_space(&mut self) -> core::fmt::Result {
         self.write_str(" ")
     }
+    /// Write an operand separator.
     fn write_separator(&mut self) -> core::fmt::Result {
         self.write_str(", ")
     }
+    /// Write a general-purpose register.
     fn write_reg(&mut self, reg: Reg) -> core::fmt::Result {
         self.write_str(reg.name())
     }
+    #[cfg(feature = "sh3")]
+    /// Write a banked register.
+    fn write_bank_reg(&mut self, reg: BankReg) -> core::fmt::Result {
+        write!(self, "r{}_bank", reg.number())
+    }
     #[cfg(feature = "sh4")]
+    /// Write a single-precision register view.
     fn write_freg(&mut self, reg: FReg) -> core::fmt::Result {
         self.write_str(reg.name())
     }
     #[cfg(feature = "sh4")]
+    /// Write a double-precision register view.
     fn write_dreg(&mut self, reg: DReg) -> core::fmt::Result {
         self.write_str(reg.name())
     }
     #[cfg(feature = "sh4")]
+    /// Write a vector register view.
     fn write_vecreg(&mut self, reg: VecReg) -> core::fmt::Result {
         self.write_str(reg.name())
     }
-    fn write_uimm(&mut self, v: u32) -> core::fmt::Result {
-        if self.options().imm_decimal {
-            write!(self, "{v}")
-        } else {
-            write!(self, "0x{v:x}")
+    /// Write an unsigned immediate.
+    fn write_uimm(&mut self, value: u32) -> core::fmt::Result {
+        match self.options().immediate_radix {
+            ImmediateRadix::Decimal => write!(self, "{value}"),
+            ImmediateRadix::Hexadecimal => write!(self, "0x{value:x}"),
         }
     }
-    fn write_simm(&mut self, v: i32) -> core::fmt::Result {
-        if self.options().imm_decimal {
-            write!(self, "{v}")
-        } else if v < 0 {
-            write!(self, "-0x{:x}", - v)
-        } else {
-            write!(self, "0x{v:x}")
+    /// Write a signed immediate.
+    fn write_simm(&mut self, value: i32) -> core::fmt::Result {
+        match self.options().immediate_radix {
+            ImmediateRadix::Decimal => write!(self, "{value}"),
+            ImmediateRadix::Hexadecimal if value < 0 => {
+                write!(self, "-0x{:x}", value.unsigned_abs())
+            }
+            ImmediateRadix::Hexadecimal => write!(self, "0x{value:x}"),
         }
     }
-    fn write_branch(&mut self, target: BranchTarget) -> core::fmt::Result {
-        write!(self, "0x{:x}", target.addr)
+    /// Write an encoded displacement and its scaled value.
+    fn write_displacement(&mut self, _encoded: Disp, value: u32) -> core::fmt::Result {
+        self.write_uimm(value)
     }
-    fn write_ins(&mut self, ins: &Ins) -> core::fmt::Result {
+    /// Write a resolved PC-relative operand.
+    fn write_pc_relative(
+        &mut self,
+        _encoded: Disp,
+        target: Address,
+    ) -> core::fmt::Result {
+        self.write_uimm(target.value())
+    }
+    /// Write a resolved direct branch destination.
+    fn write_branch(&mut self, target: Address) -> core::fmt::Result {
+        write!(self, "0x{:x}", target.value())
+    }
+    /// Write a complete instruction at an address.
+    fn write_ins(&mut self, ins: &Ins, address: u32) -> core::fmt::Result {
         ins.write_opcode(self)?;
-        ins.write_params(self)?;
-        Ok(())
+        ins.write_params_at(self, address)
     }
 }
 impl Ins {
+    /// Write only the mnemonic.
     pub fn write_opcode<W: FormatIns + ?Sized>(&self, out: &mut W) -> core::fmt::Result {
         match self {
-            Ins::MovRmRn { .. } => out.write_str("mov"),
-            Ins::MovImmRn { .. } => out.write_str("mov"),
-            Ins::MovwAtDispPcRn { .. } => out.write_str("mov.w"),
-            Ins::MovlAtDispPcRn { .. } => out.write_str("mov.l"),
-            Ins::MovbRmAtRn { .. } => out.write_str("mov.b"),
-            Ins::MovwRmAtRn { .. } => out.write_str("mov.w"),
-            Ins::MovlRmAtRn { .. } => out.write_str("mov.l"),
-            Ins::MovbAtRmRn { .. } => out.write_str("mov.b"),
-            Ins::MovwAtRmRn { .. } => out.write_str("mov.w"),
-            Ins::MovlAtRmRn { .. } => out.write_str("mov.l"),
-            Ins::MovbRmAtDecRn { .. } => out.write_str("mov.b"),
-            Ins::MovwRmAtDecRn { .. } => out.write_str("mov.w"),
-            Ins::MovlRmAtDecRn { .. } => out.write_str("mov.l"),
-            Ins::MovbAtRmIncRn { .. } => out.write_str("mov.b"),
-            Ins::MovwAtRmIncRn { .. } => out.write_str("mov.w"),
-            Ins::MovlAtRmIncRn { .. } => out.write_str("mov.l"),
-            Ins::MovbR0AtDispRn { .. } => out.write_str("mov.b"),
-            Ins::MovwR0AtDispRn { .. } => out.write_str("mov.w"),
-            Ins::MovlRmAtDispRn { .. } => out.write_str("mov.l"),
-            Ins::MovbAtDispRmR0 { .. } => out.write_str("mov.b"),
-            Ins::MovwAtDispRmR0 { .. } => out.write_str("mov.w"),
-            Ins::MovlAtDispRmRn { .. } => out.write_str("mov.l"),
-            Ins::MovbRmAtR0Rn { .. } => out.write_str("mov.b"),
-            Ins::MovwRmAtR0Rn { .. } => out.write_str("mov.w"),
-            Ins::MovlRmAtR0Rn { .. } => out.write_str("mov.l"),
-            Ins::MovbAtR0RmRn { .. } => out.write_str("mov.b"),
-            Ins::MovwAtR0RmRn { .. } => out.write_str("mov.w"),
-            Ins::MovlAtR0RmRn { .. } => out.write_str("mov.l"),
-            Ins::MovbR0AtDispGbr { .. } => out.write_str("mov.b"),
-            Ins::MovwR0AtDispGbr { .. } => out.write_str("mov.w"),
-            Ins::MovlR0AtDispGbr { .. } => out.write_str("mov.l"),
-            Ins::MovbAtDispGbrR0 { .. } => out.write_str("mov.b"),
-            Ins::MovwAtDispGbrR0 { .. } => out.write_str("mov.w"),
-            Ins::MovlAtDispGbrR0 { .. } => out.write_str("mov.l"),
-            Ins::Mova { .. } => out.write_str("mova"),
-            Ins::Movt { .. } => out.write_str("movt"),
+            Self::MovRmRn { .. } => out.write_str("mov"),
+            Self::MovImmRn { .. } => out.write_str("mov"),
+            Self::MovwAtDispPcRn { .. } => out.write_str("mov.w"),
+            Self::MovlAtDispPcRn { .. } => out.write_str("mov.l"),
+            Self::MovbRmAtRn { .. } => out.write_str("mov.b"),
+            Self::MovwRmAtRn { .. } => out.write_str("mov.w"),
+            Self::MovlRmAtRn { .. } => out.write_str("mov.l"),
+            Self::MovbAtRmRn { .. } => out.write_str("mov.b"),
+            Self::MovwAtRmRn { .. } => out.write_str("mov.w"),
+            Self::MovlAtRmRn { .. } => out.write_str("mov.l"),
+            Self::MovbRmAtDecRn { .. } => out.write_str("mov.b"),
+            Self::MovwRmAtDecRn { .. } => out.write_str("mov.w"),
+            Self::MovlRmAtDecRn { .. } => out.write_str("mov.l"),
+            Self::MovbAtRmIncRn { .. } => out.write_str("mov.b"),
+            Self::MovwAtRmIncRn { .. } => out.write_str("mov.w"),
+            Self::MovlAtRmIncRn { .. } => out.write_str("mov.l"),
+            Self::MovbR0AtDispRn { .. } => out.write_str("mov.b"),
+            Self::MovwR0AtDispRn { .. } => out.write_str("mov.w"),
+            Self::MovlRmAtDispRn { .. } => out.write_str("mov.l"),
+            Self::MovbAtDispRmR0 { .. } => out.write_str("mov.b"),
+            Self::MovwAtDispRmR0 { .. } => out.write_str("mov.w"),
+            Self::MovlAtDispRmRn { .. } => out.write_str("mov.l"),
+            Self::MovbRmAtR0Rn { .. } => out.write_str("mov.b"),
+            Self::MovwRmAtR0Rn { .. } => out.write_str("mov.w"),
+            Self::MovlRmAtR0Rn { .. } => out.write_str("mov.l"),
+            Self::MovbAtR0RmRn { .. } => out.write_str("mov.b"),
+            Self::MovwAtR0RmRn { .. } => out.write_str("mov.w"),
+            Self::MovlAtR0RmRn { .. } => out.write_str("mov.l"),
+            Self::MovbR0AtDispGbr { .. } => out.write_str("mov.b"),
+            Self::MovwR0AtDispGbr { .. } => out.write_str("mov.w"),
+            Self::MovlR0AtDispGbr { .. } => out.write_str("mov.l"),
+            Self::MovbAtDispGbrR0 { .. } => out.write_str("mov.b"),
+            Self::MovwAtDispGbrR0 { .. } => out.write_str("mov.w"),
+            Self::MovlAtDispGbrR0 { .. } => out.write_str("mov.l"),
+            Self::Mova { .. } => out.write_str("mova"),
+            Self::Movt { .. } => out.write_str("movt"),
             #[cfg(feature = "sh4")]
-            Ins::MovcalR0AtRn { .. } => out.write_str("movca.l"),
-            Ins::SwapbRmRn { .. } => out.write_str("swap.b"),
-            Ins::SwapwRmRn { .. } => out.write_str("swap.w"),
-            Ins::XtrctRmRn { .. } => out.write_str("xtrct"),
-            Ins::AddRmRn { .. } => out.write_str("add"),
-            Ins::AddImmRn { .. } => out.write_str("add"),
-            Ins::AddcRmRn { .. } => out.write_str("addc"),
-            Ins::AddvRmRn { .. } => out.write_str("addv"),
-            Ins::CmpeqImmR0 { .. } => out.write_str("cmp/eq"),
-            Ins::CmpeqRmRn { .. } => out.write_str("cmp/eq"),
-            Ins::CmpgeRmRn { .. } => out.write_str("cmp/ge"),
-            Ins::CmpgtRmRn { .. } => out.write_str("cmp/gt"),
-            Ins::CmphiRmRn { .. } => out.write_str("cmp/hi"),
-            Ins::CmphsRmRn { .. } => out.write_str("cmp/hs"),
-            Ins::CmpplRn { .. } => out.write_str("cmp/pl"),
-            Ins::CmppzRn { .. } => out.write_str("cmp/pz"),
-            Ins::CmpstrRmRn { .. } => out.write_str("cmp/str"),
-            Ins::Div0sRmRn { .. } => out.write_str("div0s"),
-            Ins::Div0u => out.write_str("div0u"),
-            Ins::Div1RmRn { .. } => out.write_str("div1"),
-            #[cfg(feature = "sh2")]
-            Ins::DmulslRmRn { .. } => out.write_str("dmuls.l"),
-            #[cfg(feature = "sh2")]
-            Ins::DmuluRmRn { .. } => out.write_str("dmulu.l"),
-            #[cfg(feature = "sh2")]
-            Ins::DtRn { .. } => out.write_str("dt"),
-            Ins::ExtsbRmRn { .. } => out.write_str("exts.b"),
-            Ins::ExtswRmRn { .. } => out.write_str("exts.w"),
-            Ins::ExtubRmRn { .. } => out.write_str("extu.b"),
-            Ins::ExtuwRmRn { .. } => out.write_str("extu.w"),
-            #[cfg(feature = "sh2")]
-            Ins::MaclAtRmIncAtRnInc { .. } => out.write_str("mac.l"),
-            Ins::MacwAtRmIncAtRnInc { .. } => out.write_str("mac.w"),
-            #[cfg(feature = "sh2")]
-            Ins::MullRmRn { .. } => out.write_str("mul.l"),
-            Ins::MulswRmRn { .. } => out.write_str("muls.w"),
-            Ins::MuluwRmRn { .. } => out.write_str("mulu.w"),
-            Ins::NegRmRn { .. } => out.write_str("neg"),
-            Ins::NegcRmRn { .. } => out.write_str("negc"),
-            Ins::SubRmRn { .. } => out.write_str("sub"),
-            Ins::SubcRmRn { .. } => out.write_str("subc"),
-            Ins::SubvRmRn { .. } => out.write_str("subv"),
-            Ins::AndRmRn { .. } => out.write_str("and"),
-            Ins::AndImmR0 { .. } => out.write_str("and"),
-            Ins::AndbImmAtR0Gbr { .. } => out.write_str("and.b"),
-            Ins::NotRmRn { .. } => out.write_str("not"),
-            Ins::OrRmRn { .. } => out.write_str("or"),
-            Ins::OrImmR0 { .. } => out.write_str("or"),
-            Ins::OrbImmAtR0Gbr { .. } => out.write_str("or.b"),
-            Ins::TasbAtRn { .. } => out.write_str("tas.b"),
-            Ins::TstRmRn { .. } => out.write_str("tst"),
-            Ins::TstImmR0 { .. } => out.write_str("tst"),
-            Ins::TstbImmAtR0Gbr { .. } => out.write_str("tst.b"),
-            Ins::XorRmRn { .. } => out.write_str("xor"),
-            Ins::XorImmR0 { .. } => out.write_str("xor"),
-            Ins::XorbImmAtR0Gbr { .. } => out.write_str("xor.b"),
-            Ins::RotlRn { .. } => out.write_str("rotl"),
-            Ins::RotrRn { .. } => out.write_str("rotr"),
-            Ins::RotclRn { .. } => out.write_str("rotcl"),
-            Ins::RotcrRn { .. } => out.write_str("rotcr"),
-            #[cfg(feature = "sh3")]
-            Ins::ShadRmRn { .. } => out.write_str("shad"),
-            Ins::ShalRn { .. } => out.write_str("shal"),
-            Ins::SharRn { .. } => out.write_str("shar"),
-            #[cfg(feature = "sh3")]
-            Ins::ShldRmRn { .. } => out.write_str("shld"),
-            Ins::ShllRn { .. } => out.write_str("shll"),
-            Ins::Shll2Rn { .. } => out.write_str("shll2"),
-            Ins::Shll8Rn { .. } => out.write_str("shll8"),
-            Ins::Shll16Rn { .. } => out.write_str("shll16"),
-            Ins::ShlrRn { .. } => out.write_str("shlr"),
-            Ins::Shlr2Rn { .. } => out.write_str("shlr2"),
-            Ins::Shlr8Rn { .. } => out.write_str("shlr8"),
-            Ins::Shlr16Rn { .. } => out.write_str("shlr16"),
-            Ins::Bt { .. } => out.write_str("bt"),
-            #[cfg(feature = "sh2")]
-            Ins::Bts { .. } => out.write_str("bt.s"),
-            Ins::Bf { .. } => out.write_str("bf"),
-            #[cfg(feature = "sh2")]
-            Ins::Bfs { .. } => out.write_str("bf.s"),
-            Ins::Bra { .. } => out.write_str("bra"),
-            Ins::Bsr { .. } => out.write_str("bsr"),
-            #[cfg(feature = "sh2")]
-            Ins::BrafRn { .. } => out.write_str("braf"),
-            #[cfg(feature = "sh2")]
-            Ins::BsrfRn { .. } => out.write_str("bsrf"),
-            Ins::JmpAtRn { .. } => out.write_str("jmp"),
-            Ins::JsrAtRn { .. } => out.write_str("jsr"),
-            Ins::Rts => out.write_str("rts"),
-            Ins::Rte => out.write_str("rte"),
-            Ins::Clrmac => out.write_str("clrmac"),
-            #[cfg(feature = "sh3")]
-            Ins::Clrs => out.write_str("clrs"),
-            Ins::Clrt => out.write_str("clrt"),
-            #[cfg(feature = "sh3")]
-            Ins::Sets => out.write_str("sets"),
-            Ins::Sett => out.write_str("sett"),
-            Ins::Nop => out.write_str("nop"),
-            Ins::Sleep => out.write_str("sleep"),
-            #[cfg(feature = "sh3")]
-            Ins::Ldtlb => out.write_str("ldtlb"),
-            Ins::Trapa { .. } => out.write_str("trapa"),
-            Ins::StcSrRn { .. } => out.write_str("stc"),
-            Ins::StcGbrRn { .. } => out.write_str("stc"),
-            Ins::StcVbrRn { .. } => out.write_str("stc"),
-            #[cfg(feature = "sh3")]
-            Ins::StcSsrRn { .. } => out.write_str("stc"),
-            #[cfg(feature = "sh3")]
-            Ins::StcSpcRn { .. } => out.write_str("stc"),
+            Self::MovcalR0AtRn { .. } => out.write_str("movca.l"),
+            Self::SwapbRmRn { .. } => out.write_str("swap.b"),
+            Self::SwapwRmRn { .. } => out.write_str("swap.w"),
+            Self::XtrctRmRn { .. } => out.write_str("xtrct"),
+            Self::AddRmRn { .. } => out.write_str("add"),
+            Self::AddImmRn { .. } => out.write_str("add"),
+            Self::AddcRmRn { .. } => out.write_str("addc"),
+            Self::AddvRmRn { .. } => out.write_str("addv"),
+            Self::CmpeqImmR0 { .. } => out.write_str("cmp/eq"),
+            Self::CmpeqRmRn { .. } => out.write_str("cmp/eq"),
+            Self::CmpgeRmRn { .. } => out.write_str("cmp/ge"),
+            Self::CmpgtRmRn { .. } => out.write_str("cmp/gt"),
+            Self::CmphiRmRn { .. } => out.write_str("cmp/hi"),
+            Self::CmphsRmRn { .. } => out.write_str("cmp/hs"),
+            Self::CmpplRn { .. } => out.write_str("cmp/pl"),
+            Self::CmppzRn { .. } => out.write_str("cmp/pz"),
+            Self::CmpstrRmRn { .. } => out.write_str("cmp/str"),
+            Self::Div0sRmRn { .. } => out.write_str("div0s"),
+            Self::Div0u => out.write_str("div0u"),
+            Self::Div1RmRn { .. } => out.write_str("div1"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::DmulslRmRn { .. } => out.write_str("dmuls.l"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::DmuluRmRn { .. } => out.write_str("dmulu.l"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::DtRn { .. } => out.write_str("dt"),
+            Self::ExtsbRmRn { .. } => out.write_str("exts.b"),
+            Self::ExtswRmRn { .. } => out.write_str("exts.w"),
+            Self::ExtubRmRn { .. } => out.write_str("extu.b"),
+            Self::ExtuwRmRn { .. } => out.write_str("extu.w"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::MaclAtRmIncAtRnInc { .. } => out.write_str("mac.l"),
+            Self::MacwAtRmIncAtRnInc { .. } => out.write_str("mac.w"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::MullRmRn { .. } => out.write_str("mul.l"),
+            Self::MulswRmRn { .. } => out.write_str("muls.w"),
+            Self::MuluwRmRn { .. } => out.write_str("mulu.w"),
+            Self::NegRmRn { .. } => out.write_str("neg"),
+            Self::NegcRmRn { .. } => out.write_str("negc"),
+            Self::SubRmRn { .. } => out.write_str("sub"),
+            Self::SubcRmRn { .. } => out.write_str("subc"),
+            Self::SubvRmRn { .. } => out.write_str("subv"),
+            Self::AndRmRn { .. } => out.write_str("and"),
+            Self::AndImmR0 { .. } => out.write_str("and"),
+            Self::AndbImmAtR0Gbr { .. } => out.write_str("and.b"),
+            Self::NotRmRn { .. } => out.write_str("not"),
+            Self::OrRmRn { .. } => out.write_str("or"),
+            Self::OrImmR0 { .. } => out.write_str("or"),
+            Self::OrbImmAtR0Gbr { .. } => out.write_str("or.b"),
+            Self::TasbAtRn { .. } => out.write_str("tas.b"),
+            Self::TstRmRn { .. } => out.write_str("tst"),
+            Self::TstImmR0 { .. } => out.write_str("tst"),
+            Self::TstbImmAtR0Gbr { .. } => out.write_str("tst.b"),
+            Self::XorRmRn { .. } => out.write_str("xor"),
+            Self::XorImmR0 { .. } => out.write_str("xor"),
+            Self::XorbImmAtR0Gbr { .. } => out.write_str("xor.b"),
+            Self::RotlRn { .. } => out.write_str("rotl"),
+            Self::RotrRn { .. } => out.write_str("rotr"),
+            Self::RotclRn { .. } => out.write_str("rotcl"),
+            Self::RotcrRn { .. } => out.write_str("rotcr"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::ShadRmRn { .. } => out.write_str("shad"),
+            Self::ShalRn { .. } => out.write_str("shal"),
+            Self::SharRn { .. } => out.write_str("shar"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::ShldRmRn { .. } => out.write_str("shld"),
+            Self::ShllRn { .. } => out.write_str("shll"),
+            Self::Shll2Rn { .. } => out.write_str("shll2"),
+            Self::Shll8Rn { .. } => out.write_str("shll8"),
+            Self::Shll16Rn { .. } => out.write_str("shll16"),
+            Self::ShlrRn { .. } => out.write_str("shlr"),
+            Self::Shlr2Rn { .. } => out.write_str("shlr2"),
+            Self::Shlr8Rn { .. } => out.write_str("shlr8"),
+            Self::Shlr16Rn { .. } => out.write_str("shlr16"),
+            Self::Bt { .. } => out.write_str("bt"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::Bts { .. } => out.write_str("bt/s"),
+            Self::Bf { .. } => out.write_str("bf"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::Bfs { .. } => out.write_str("bf/s"),
+            Self::Bra { .. } => out.write_str("bra"),
+            Self::Bsr { .. } => out.write_str("bsr"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::BrafRn { .. } => out.write_str("braf"),
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::BsrfRn { .. } => out.write_str("bsrf"),
+            Self::JmpAtRn { .. } => out.write_str("jmp"),
+            Self::JsrAtRn { .. } => out.write_str("jsr"),
+            Self::Rts => out.write_str("rts"),
+            Self::Rte => out.write_str("rte"),
+            Self::Clrmac => out.write_str("clrmac"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::Clrs => out.write_str("clrs"),
+            Self::Clrt => out.write_str("clrt"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::Sets => out.write_str("sets"),
+            Self::Sett => out.write_str("sett"),
+            Self::Nop => out.write_str("nop"),
+            Self::Sleep => out.write_str("sleep"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::Ldtlb => out.write_str("ldtlb"),
+            Self::Trapa { .. } => out.write_str("trapa"),
+            Self::StcSrRn { .. } => out.write_str("stc"),
+            Self::StcGbrRn { .. } => out.write_str("stc"),
+            Self::StcVbrRn { .. } => out.write_str("stc"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StcSsrRn { .. } => out.write_str("stc"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StcSpcRn { .. } => out.write_str("stc"),
             #[cfg(feature = "sh4")]
-            Ins::StcDbrRn { .. } => out.write_str("stc"),
+            Self::StcDbrRn { .. } => out.write_str("stc"),
             #[cfg(feature = "sh4")]
-            Ins::StcSgrRn { .. } => out.write_str("stc"),
-            #[cfg(feature = "sh3")]
-            Ins::StcBankRn { .. } => out.write_str("stc"),
-            #[cfg(feature = "sh3")]
-            Ins::StcLoBank5Rn { .. } => out.write_str("stc"),
-            #[cfg(feature = "sh3")]
-            Ins::StcLoBank6Rn { .. } => out.write_str("stc"),
-            #[cfg(feature = "sh3")]
-            Ins::StcLoBank7Rn { .. } => out.write_str("stc"),
-            Ins::StclSrAtDecRn { .. } => out.write_str("stc.l"),
-            Ins::StclGbrAtDecRn { .. } => out.write_str("stc.l"),
-            Ins::StclVbrAtDecRn { .. } => out.write_str("stc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::StclSsrAtDecRn { .. } => out.write_str("stc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::StclSpcAtDecRn { .. } => out.write_str("stc.l"),
+            Self::StcSgrRn { .. } => out.write_str("stc"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StcBankRn { .. } => out.write_str("stc"),
+            Self::StclSrAtDecRn { .. } => out.write_str("stc.l"),
+            Self::StclGbrAtDecRn { .. } => out.write_str("stc.l"),
+            Self::StclVbrAtDecRn { .. } => out.write_str("stc.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StclSsrAtDecRn { .. } => out.write_str("stc.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StclSpcAtDecRn { .. } => out.write_str("stc.l"),
             #[cfg(feature = "sh4")]
-            Ins::StclDbrAtDecRn { .. } => out.write_str("stc.l"),
+            Self::StclDbrAtDecRn { .. } => out.write_str("stc.l"),
             #[cfg(feature = "sh4")]
-            Ins::StclSgrAtDecRn { .. } => out.write_str("stc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::StclBankAtDecRn { .. } => out.write_str("stc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::StclLoBank5AtDecRn { .. } => out.write_str("stc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::StclLoBank6AtDecRn { .. } => out.write_str("stc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::StclLoBank7AtDecRn { .. } => out.write_str("stc.l"),
-            Ins::LdcRmSr { .. } => out.write_str("ldc"),
-            Ins::LdcRmGbr { .. } => out.write_str("ldc"),
-            Ins::LdcRmVbr { .. } => out.write_str("ldc"),
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmSsr { .. } => out.write_str("ldc"),
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmSpc { .. } => out.write_str("ldc"),
+            Self::StclSgrAtDecRn { .. } => out.write_str("stc.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StclBankAtDecRn { .. } => out.write_str("stc.l"),
+            Self::LdcRmSr { .. } => out.write_str("ldc"),
+            Self::LdcRmGbr { .. } => out.write_str("ldc"),
+            Self::LdcRmVbr { .. } => out.write_str("ldc"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdcRmSsr { .. } => out.write_str("ldc"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdcRmSpc { .. } => out.write_str("ldc"),
             #[cfg(feature = "sh4")]
-            Ins::LdcRmDbr { .. } => out.write_str("ldc"),
+            Self::LdcRmDbr { .. } => out.write_str("ldc"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdcRmBank { .. } => out.write_str("ldc"),
+            Self::LdclAtRmIncSr { .. } => out.write_str("ldc.l"),
+            Self::LdclAtRmIncGbr { .. } => out.write_str("ldc.l"),
+            Self::LdclAtRmIncVbr { .. } => out.write_str("ldc.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdclAtRmIncSsr { .. } => out.write_str("ldc.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdclAtRmIncSpc { .. } => out.write_str("ldc.l"),
             #[cfg(feature = "sh4")]
-            Ins::LdcRmSgr { .. } => out.write_str("ldc"),
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmBank { .. } => out.write_str("ldc"),
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmLoBank5 { .. } => out.write_str("ldc"),
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmLoBank6 { .. } => out.write_str("ldc"),
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmLoBank7 { .. } => out.write_str("ldc"),
-            Ins::LdclAtRmIncSr { .. } => out.write_str("ldc.l"),
-            Ins::LdclAtRmIncGbr { .. } => out.write_str("ldc.l"),
-            Ins::LdclAtRmIncVbr { .. } => out.write_str("ldc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncSsr { .. } => out.write_str("ldc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncSpc { .. } => out.write_str("ldc.l"),
+            Self::LdclAtRmIncDbr { .. } => out.write_str("ldc.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdclAtRmIncBank { .. } => out.write_str("ldc.l"),
+            Self::StsMachRn { .. } => out.write_str("sts"),
+            Self::StsMaclRn { .. } => out.write_str("sts"),
+            Self::StsPrRn { .. } => out.write_str("sts"),
             #[cfg(feature = "sh4")]
-            Ins::LdclAtRmIncDbr { .. } => out.write_str("ldc.l"),
+            Self::StsFpscrRn { .. } => out.write_str("sts"),
             #[cfg(feature = "sh4")]
-            Ins::LdclAtRmIncSgr { .. } => out.write_str("ldc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncBank { .. } => out.write_str("ldc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncLoBank5 { .. } => out.write_str("ldc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncLoBank6 { .. } => out.write_str("ldc.l"),
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncLoBank7 { .. } => out.write_str("ldc.l"),
-            Ins::StsMachRn { .. } => out.write_str("sts"),
-            Ins::StsMaclRn { .. } => out.write_str("sts"),
-            Ins::StsPrRn { .. } => out.write_str("sts"),
+            Self::StsFpulRn { .. } => out.write_str("sts"),
+            Self::StslMachAtDecRn { .. } => out.write_str("sts.l"),
+            Self::StslMaclAtDecRn { .. } => out.write_str("sts.l"),
+            Self::StslPrAtDecRn { .. } => out.write_str("sts.l"),
             #[cfg(feature = "sh4")]
-            Ins::StsFpscrRn { .. } => out.write_str("sts"),
+            Self::StslFpscrAtDecRn { .. } => out.write_str("sts.l"),
             #[cfg(feature = "sh4")]
-            Ins::StsFpulRn { .. } => out.write_str("sts"),
-            Ins::StslMachAtDecRn { .. } => out.write_str("sts.l"),
-            Ins::StslMaclAtDecRn { .. } => out.write_str("sts.l"),
-            Ins::StslPrAtDecRn { .. } => out.write_str("sts.l"),
+            Self::StslFpulAtDecRn { .. } => out.write_str("sts.l"),
+            Self::LdsRmMach { .. } => out.write_str("lds"),
+            Self::LdsRmMacl { .. } => out.write_str("lds"),
+            Self::LdsRmPr { .. } => out.write_str("lds"),
             #[cfg(feature = "sh4")]
-            Ins::StslFpscrAtDecRn { .. } => out.write_str("sts.l"),
+            Self::LdsRmFpscr { .. } => out.write_str("lds"),
             #[cfg(feature = "sh4")]
-            Ins::StslFpulAtDecRn { .. } => out.write_str("sts.l"),
-            Ins::LdsRmMach { .. } => out.write_str("lds"),
-            Ins::LdsRmMacl { .. } => out.write_str("lds"),
-            Ins::LdsRmPr { .. } => out.write_str("lds"),
+            Self::LdsRmFpul { .. } => out.write_str("lds"),
+            Self::LdslAtRmIncMach { .. } => out.write_str("lds.l"),
+            Self::LdslAtRmIncMacl { .. } => out.write_str("lds.l"),
+            Self::LdslAtRmIncPr { .. } => out.write_str("lds.l"),
             #[cfg(feature = "sh4")]
-            Ins::LdsRmFpscr { .. } => out.write_str("lds"),
+            Self::LdslAtRmIncFpscr { .. } => out.write_str("lds.l"),
             #[cfg(feature = "sh4")]
-            Ins::LdsRmFpul { .. } => out.write_str("lds"),
-            Ins::LdslAtRmIncMach { .. } => out.write_str("lds.l"),
-            Ins::LdslAtRmIncMacl { .. } => out.write_str("lds.l"),
-            Ins::LdslAtRmIncPr { .. } => out.write_str("lds.l"),
+            Self::LdslAtRmIncFpul { .. } => out.write_str("lds.l"),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::PrefAtRn { .. } => out.write_str("pref"),
             #[cfg(feature = "sh4")]
-            Ins::LdslAtRmIncFpscr { .. } => out.write_str("lds.l"),
+            Self::OcbiAtRn { .. } => out.write_str("ocbi"),
             #[cfg(feature = "sh4")]
-            Ins::LdslAtRmIncFpul { .. } => out.write_str("lds.l"),
-            #[cfg(feature = "sh3")]
-            Ins::PrefAtRn { .. } => out.write_str("pref"),
+            Self::OcbpAtRn { .. } => out.write_str("ocbp"),
             #[cfg(feature = "sh4")]
-            Ins::OcbiAtRn { .. } => out.write_str("ocbi"),
+            Self::OcbwbAtRn { .. } => out.write_str("ocbwb"),
             #[cfg(feature = "sh4")]
-            Ins::OcbpAtRn { .. } => out.write_str("ocbp"),
+            Self::FaddFrmFrn { .. } => out.write_str("fadd"),
             #[cfg(feature = "sh4")]
-            Ins::OcbwbAtRn { .. } => out.write_str("ocbwb"),
+            Self::FsubFrmFrn { .. } => out.write_str("fsub"),
             #[cfg(feature = "sh4")]
-            Ins::FaddFrmFrn { .. } => out.write_str("fadd"),
+            Self::FmulFrmFrn { .. } => out.write_str("fmul"),
             #[cfg(feature = "sh4")]
-            Ins::FsubFrmFrn { .. } => out.write_str("fsub"),
+            Self::FdivFrmFrn { .. } => out.write_str("fdiv"),
             #[cfg(feature = "sh4")]
-            Ins::FmulFrmFrn { .. } => out.write_str("fmul"),
+            Self::FcmpeqFrmFrn { .. } => out.write_str("fcmp/eq"),
             #[cfg(feature = "sh4")]
-            Ins::FdivFrmFrn { .. } => out.write_str("fdiv"),
+            Self::FcmpgtFrmFrn { .. } => out.write_str("fcmp/gt"),
             #[cfg(feature = "sh4")]
-            Ins::FcmpeqFrmFrn { .. } => out.write_str("fcmp/eq"),
+            Self::FmovAtR0RmFrn { .. } => out.write_str("fmov.s"),
             #[cfg(feature = "sh4")]
-            Ins::FcmpgtFrmFrn { .. } => out.write_str("fcmp/gt"),
+            Self::FmovFrmAtR0Rn { .. } => out.write_str("fmov.s"),
             #[cfg(feature = "sh4")]
-            Ins::FmovAtR0RmFrn { .. } => out.write_str("fmov"),
+            Self::FmovAtRmFrn { .. } => out.write_str("fmov.s"),
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmAtR0Rn { .. } => out.write_str("fmov"),
+            Self::FmovAtRmIncFrn { .. } => out.write_str("fmov.s"),
             #[cfg(feature = "sh4")]
-            Ins::FmovAtRmFrn { .. } => out.write_str("fmov"),
+            Self::FmovFrmAtRn { .. } => out.write_str("fmov.s"),
             #[cfg(feature = "sh4")]
-            Ins::FmovAtRmIncFrn { .. } => out.write_str("fmov"),
+            Self::FmovFrmAtDecRn { .. } => out.write_str("fmov.s"),
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmAtRn { .. } => out.write_str("fmov"),
+            Self::FmovFrmFrn { .. } => out.write_str("fmov"),
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmAtDecRn { .. } => out.write_str("fmov"),
+            Self::FstsFpulFrn { .. } => out.write_str("fsts"),
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmFrn { .. } => out.write_str("fmov"),
+            Self::FldsFrnFpul { .. } => out.write_str("flds"),
             #[cfg(feature = "sh4")]
-            Ins::FstsFpulFrn { .. } => out.write_str("fsts"),
+            Self::FloatFpulFrn { .. } => out.write_str("float"),
             #[cfg(feature = "sh4")]
-            Ins::FldsFrnFpul { .. } => out.write_str("flds"),
+            Self::FtrcFrnFpul { .. } => out.write_str("ftrc"),
             #[cfg(feature = "sh4")]
-            Ins::FloatFpulFrn { .. } => out.write_str("float"),
+            Self::FnegFrn { .. } => out.write_str("fneg"),
             #[cfg(feature = "sh4")]
-            Ins::FtrcFrnFpul { .. } => out.write_str("ftrc"),
+            Self::FabsFrn { .. } => out.write_str("fabs"),
             #[cfg(feature = "sh4")]
-            Ins::FnegFrn { .. } => out.write_str("fneg"),
+            Self::FsqrtFrn { .. } => out.write_str("fsqrt"),
             #[cfg(feature = "sh4")]
-            Ins::FabsFrn { .. } => out.write_str("fabs"),
+            Self::Fldi0Frn { .. } => out.write_str("fldi0"),
             #[cfg(feature = "sh4")]
-            Ins::FsqrtFrn { .. } => out.write_str("fsqrt"),
+            Self::Fldi1Frn { .. } => out.write_str("fldi1"),
             #[cfg(feature = "sh4")]
-            Ins::Fldi0Frn { .. } => out.write_str("fldi0"),
+            Self::FmacFr0FrmFrn { .. } => out.write_str("fmac"),
             #[cfg(feature = "sh4")]
-            Ins::Fldi1Frn { .. } => out.write_str("fldi1"),
+            Self::FcnvsdFpulDrn { .. } => out.write_str("fcnvsd"),
             #[cfg(feature = "sh4")]
-            Ins::FmacFr0FrmFrn { .. } => out.write_str("fmac"),
+            Self::FcnvdsDrnFpul { .. } => out.write_str("fcnvds"),
             #[cfg(feature = "sh4")]
-            Ins::FcnvsdFpulDrn { .. } => out.write_str("fcnvsd"),
+            Self::FiprFvmFvn { .. } => out.write_str("fipr"),
             #[cfg(feature = "sh4")]
-            Ins::FcnvdsDrnFpul { .. } => out.write_str("fcnvds"),
+            Self::FtrvXmtrxFvn { .. } => out.write_str("ftrv"),
             #[cfg(feature = "sh4")]
-            Ins::FiprFvmFvn { .. } => out.write_str("fipr"),
+            Self::Fschg => out.write_str("fschg"),
             #[cfg(feature = "sh4")]
-            Ins::FtrvXmtrxFvn { .. } => out.write_str("ftrv"),
-            #[cfg(feature = "sh4")]
-            Ins::FsrraFrn { .. } => out.write_str("fsrra"),
-            #[cfg(feature = "sh4")]
-            Ins::FscaFpulDrn { .. } => out.write_str("fsca"),
-            #[cfg(feature = "sh4")]
-            Ins::Fschg => out.write_str("fschg"),
-            #[cfg(feature = "sh4")]
-            Ins::Frchg => out.write_str("frchg"),
-            Ins::Word(_) => out.write_str(".word"),
-            Ins::Byte(_) => out.write_str(".byte"),
-            Ins::Long(_) => out.write_str(".long"),
+            Self::Frchg => out.write_str("frchg"),
         }
     }
-    pub fn write_params<W: FormatIns + ?Sized>(&self, out: &mut W) -> core::fmt::Result {
+    /// Write only the operands, resolving location-dependent values at `address`.
+    pub fn write_params_at<W: FormatIns + ?Sized>(
+        &self,
+        out: &mut W,
+        address: u32,
+    ) -> core::fmt::Result {
         match self {
-            Ins::MovRmRn { rn, rm } => {
+            Self::MovRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovImmRn { rn, imm } => {
+            Self::MovImmRn { rn, imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_simm(*imm as i32)?;
@@ -407,44 +406,59 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovwAtDispPcRn { rn, disp } => {
+            Self::MovwAtDispPcRn { rn, disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp as u32 * 2u32 + 4u32)?;
+                out.write_pc_relative(
+                    *disp,
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add(u32::from(disp.value()) * 2u32),
+                    ),
+                )?;
                 out.write_str(", pc), ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovlAtDispPcRn { rn, disp } => {
+            Self::MovlAtDispPcRn { rn, disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp)?;
+                out.write_pc_relative(
+                    *disp,
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_sub(address & 3u32)
+                            .wrapping_add(u32::from(disp.value()) * 4u32),
+                    ),
+                )?;
                 out.write_str(", pc), ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbRmAtRn { rn, rm } => {
+            Self::MovbRmAtRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovwRmAtRn { rn, rm } => {
+            Self::MovwRmAtRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovlRmAtRn { rn, rm } => {
+            Self::MovlRmAtRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbAtRmRn { rn, rm } => {
+            Self::MovbAtRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -452,7 +466,7 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovwAtRmRn { rn, rm } => {
+            Self::MovwAtRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -460,7 +474,7 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovlAtRmRn { rn, rm } => {
+            Self::MovlAtRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -468,28 +482,28 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbRmAtDecRn { rn, rm } => {
+            Self::MovbRmAtDecRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovwRmAtDecRn { rn, rm } => {
+            Self::MovwRmAtDecRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovlRmAtDecRn { rn, rm } => {
+            Self::MovlRmAtDecRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbAtRmIncRn { rn, rm } => {
+            Self::MovbAtRmIncRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -497,7 +511,7 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovwAtRmIncRn { rn, rm } => {
+            Self::MovwAtRmIncRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -505,7 +519,7 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovlAtRmIncRn { rn, rm } => {
+            Self::MovlAtRmIncRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -513,63 +527,63 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbR0AtDispRn { rn, disp } => {
+            Self::MovbR0AtDispRn { rn, disp } => {
                 out.write_space()?;
                 out.write_str("r0, @(")?;
-                out.write_uimm(*disp as u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 1u32)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 out.write_str(")")?;
                 Ok(())
             }
-            Ins::MovwR0AtDispRn { rn, disp } => {
+            Self::MovwR0AtDispRn { rn, disp } => {
                 out.write_space()?;
                 out.write_str("r0, @(")?;
-                out.write_uimm(*disp as u32 * 2u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 2u32)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 out.write_str(")")?;
                 Ok(())
             }
-            Ins::MovlRmAtDispRn { rn, rm, disp } => {
+            Self::MovlRmAtDispRn { rn, rm, disp } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @(")?;
-                out.write_uimm(*disp as u32 * 4u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 4u32)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 out.write_str(")")?;
                 Ok(())
             }
-            Ins::MovbAtDispRmR0 { rm, disp } => {
+            Self::MovbAtDispRmR0 { rm, disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp as u32)?;
-                out.write_separator()?;
-                out.write_reg(*rm)?;
-                out.write_str("), r0")?;
-                Ok(())
-            }
-            Ins::MovwAtDispRmR0 { rm, disp } => {
-                out.write_space()?;
-                out.write_str("@(")?;
-                out.write_uimm(*disp as u32 * 2u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 1u32)?;
                 out.write_separator()?;
                 out.write_reg(*rm)?;
                 out.write_str("), r0")?;
                 Ok(())
             }
-            Ins::MovlAtDispRmRn { rn, rm, disp } => {
+            Self::MovwAtDispRmR0 { rm, disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp as u32 * 4u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 2u32)?;
+                out.write_separator()?;
+                out.write_reg(*rm)?;
+                out.write_str("), r0")?;
+                Ok(())
+            }
+            Self::MovlAtDispRmRn { rn, rm, disp } => {
+                out.write_space()?;
+                out.write_str("@(")?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 4u32)?;
                 out.write_separator()?;
                 out.write_reg(*rm)?;
                 out.write_str("), ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbRmAtR0Rn { rn, rm } => {
+            Self::MovbRmAtR0Rn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @(r0, ")?;
@@ -577,7 +591,7 @@ impl Ins {
                 out.write_str(")")?;
                 Ok(())
             }
-            Ins::MovwRmAtR0Rn { rn, rm } => {
+            Self::MovwRmAtR0Rn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @(r0, ")?;
@@ -585,7 +599,7 @@ impl Ins {
                 out.write_str(")")?;
                 Ok(())
             }
-            Ins::MovlRmAtR0Rn { rn, rm } => {
+            Self::MovlRmAtR0Rn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", @(r0, ")?;
@@ -593,7 +607,7 @@ impl Ins {
                 out.write_str(")")?;
                 Ok(())
             }
-            Ins::MovbAtR0RmRn { rn, rm } => {
+            Self::MovbAtR0RmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@(r0, ")?;
                 out.write_reg(*rm)?;
@@ -601,7 +615,7 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovwAtR0RmRn { rn, rm } => {
+            Self::MovwAtR0RmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@(r0, ")?;
                 out.write_reg(*rm)?;
@@ -609,7 +623,7 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovlAtR0RmRn { rn, rm } => {
+            Self::MovlAtR0RmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@(r0, ")?;
                 out.write_reg(*rm)?;
@@ -617,96 +631,104 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MovbR0AtDispGbr { disp } => {
+            Self::MovbR0AtDispGbr { disp } => {
                 out.write_space()?;
                 out.write_str("r0, @(")?;
-                out.write_uimm(*disp as u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 1u32)?;
                 out.write_str(", gbr)")?;
                 Ok(())
             }
-            Ins::MovwR0AtDispGbr { disp } => {
+            Self::MovwR0AtDispGbr { disp } => {
                 out.write_space()?;
                 out.write_str("r0, @(")?;
-                out.write_uimm(*disp as u32 * 2u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 2u32)?;
                 out.write_str(", gbr)")?;
                 Ok(())
             }
-            Ins::MovlR0AtDispGbr { disp } => {
+            Self::MovlR0AtDispGbr { disp } => {
                 out.write_space()?;
                 out.write_str("r0, @(")?;
-                out.write_uimm(*disp as u32 * 4u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 4u32)?;
                 out.write_str(", gbr)")?;
                 Ok(())
             }
-            Ins::MovbAtDispGbrR0 { disp } => {
+            Self::MovbAtDispGbrR0 { disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp as u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 1u32)?;
                 out.write_str(", gbr), r0")?;
                 Ok(())
             }
-            Ins::MovwAtDispGbrR0 { disp } => {
+            Self::MovwAtDispGbrR0 { disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp as u32 * 2u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 2u32)?;
                 out.write_str(", gbr), r0")?;
                 Ok(())
             }
-            Ins::MovlAtDispGbrR0 { disp } => {
+            Self::MovlAtDispGbrR0 { disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp as u32 * 4u32)?;
+                out.write_displacement(*disp, u32::from(disp.value()) * 4u32)?;
                 out.write_str(", gbr), r0")?;
                 Ok(())
             }
-            Ins::Mova { disp } => {
+            Self::Mova { disp } => {
                 out.write_space()?;
                 out.write_str("@(")?;
-                out.write_uimm(*disp)?;
+                out.write_pc_relative(
+                    *disp,
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_sub(address & 3u32)
+                            .wrapping_add(u32::from(disp.value()) * 4u32),
+                    ),
+                )?;
                 out.write_str(", pc), r0")?;
                 Ok(())
             }
-            Ins::Movt { rn } => {
+            Self::Movt { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::MovcalR0AtRn { rn } => {
+            Self::MovcalR0AtRn { rn } => {
                 out.write_space()?;
                 out.write_str("r0, @")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::SwapbRmRn { rn, rm } => {
+            Self::SwapbRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::SwapwRmRn { rn, rm } => {
+            Self::SwapwRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::XtrctRmRn { rn, rm } => {
+            Self::XtrctRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::AddRmRn { rn, rm } => {
+            Self::AddRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::AddImmRn { rn, imm } => {
+            Self::AddImmRn { rn, imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_simm(*imm as i32)?;
@@ -714,146 +736,146 @@ impl Ins {
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::AddcRmRn { rn, rm } => {
+            Self::AddcRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::AddvRmRn { rn, rm } => {
+            Self::AddvRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmpeqImmR0 { imm } => {
+            Self::CmpeqImmR0 { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_simm(*imm as i32)?;
                 out.write_str(", r0")?;
                 Ok(())
             }
-            Ins::CmpeqRmRn { rn, rm } => {
+            Self::CmpeqRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmpgeRmRn { rn, rm } => {
+            Self::CmpgeRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmpgtRmRn { rn, rm } => {
+            Self::CmpgtRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmphiRmRn { rn, rm } => {
+            Self::CmphiRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmphsRmRn { rn, rm } => {
+            Self::CmphsRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmpplRn { rn } => {
+            Self::CmpplRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmppzRn { rn } => {
+            Self::CmppzRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::CmpstrRmRn { rn, rm } => {
-                out.write_space()?;
-                out.write_reg(*rm)?;
-                out.write_separator()?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            Ins::Div0sRmRn { rn, rm } => {
+            Self::CmpstrRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Div0u => Ok(()),
-            Ins::Div1RmRn { rn, rm } => {
+            Self::Div0sRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::DmulslRmRn { rn, rm } => {
+            Self::Div0u => Ok(()),
+            Self::Div1RmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::DmuluRmRn { rn, rm } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::DmulslRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::DtRn { rn } => {
-                out.write_space()?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            Ins::ExtsbRmRn { rn, rm } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::DmuluRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::ExtswRmRn { rn, rm } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::DtRn { rn } => {
+                out.write_space()?;
+                out.write_reg(*rn)?;
+                Ok(())
+            }
+            Self::ExtsbRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::ExtubRmRn { rn, rm } => {
+            Self::ExtswRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::ExtuwRmRn { rn, rm } => {
+            Self::ExtubRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::MaclAtRmIncAtRnInc { rn, rm } => {
+            Self::ExtuwRmRn { rn, rm } => {
+                out.write_space()?;
+                out.write_reg(*rm)?;
+                out.write_separator()?;
+                out.write_reg(*rn)?;
+                Ok(())
+            }
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::MaclAtRmIncAtRnInc { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -862,7 +884,7 @@ impl Ins {
                 out.write_str("+")?;
                 Ok(())
             }
-            Ins::MacwAtRmIncAtRnInc { rn, rm } => {
+            Self::MacwAtRmIncAtRnInc { rn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -871,580 +893,546 @@ impl Ins {
                 out.write_str("+")?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::MullRmRn { rn, rm } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::MullRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MulswRmRn { rn, rm } => {
+            Self::MulswRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::MuluwRmRn { rn, rm } => {
+            Self::MuluwRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::NegRmRn { rn, rm } => {
+            Self::NegRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::NegcRmRn { rn, rm } => {
+            Self::NegcRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::SubRmRn { rn, rm } => {
+            Self::SubRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::SubcRmRn { rn, rm } => {
+            Self::SubcRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::SubvRmRn { rn, rm } => {
+            Self::SubvRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::AndRmRn { rn, rm } => {
+            Self::AndRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::AndImmR0 { imm } => {
+            Self::AndImmR0 { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", r0")?;
                 Ok(())
             }
-            Ins::AndbImmAtR0Gbr { imm } => {
+            Self::AndbImmAtR0Gbr { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", @(r0, gbr)")?;
                 Ok(())
             }
-            Ins::NotRmRn { rn, rm } => {
+            Self::NotRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::OrRmRn { rn, rm } => {
+            Self::OrRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::OrImmR0 { imm } => {
+            Self::OrImmR0 { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", r0")?;
                 Ok(())
             }
-            Ins::OrbImmAtR0Gbr { imm } => {
+            Self::OrbImmAtR0Gbr { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", @(r0, gbr)")?;
                 Ok(())
             }
-            Ins::TasbAtRn { rn } => {
+            Self::TasbAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::TstRmRn { rn, rm } => {
+            Self::TstRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::TstImmR0 { imm } => {
+            Self::TstImmR0 { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", r0")?;
                 Ok(())
             }
-            Ins::TstbImmAtR0Gbr { imm } => {
+            Self::TstbImmAtR0Gbr { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", @(r0, gbr)")?;
                 Ok(())
             }
-            Ins::XorRmRn { rn, rm } => {
+            Self::XorRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::XorImmR0 { imm } => {
+            Self::XorImmR0 { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", r0")?;
                 Ok(())
             }
-            Ins::XorbImmAtR0Gbr { imm } => {
+            Self::XorbImmAtR0Gbr { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 out.write_str(", @(r0, gbr)")?;
                 Ok(())
             }
-            Ins::RotlRn { rn } => {
+            Self::RotlRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::RotrRn { rn } => {
+            Self::RotrRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::RotclRn { rn } => {
+            Self::RotclRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::RotcrRn { rn } => {
+            Self::RotcrRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::ShadRmRn { rn, rm } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::ShadRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::ShalRn { rn } => {
+            Self::ShalRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::SharRn { rn } => {
+            Self::SharRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::ShldRmRn { rn, rm } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::ShldRmRn { rn, rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_separator()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::ShllRn { rn } => {
+            Self::ShllRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Shll2Rn { rn } => {
+            Self::Shll2Rn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Shll8Rn { rn } => {
+            Self::Shll8Rn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Shll16Rn { rn } => {
+            Self::Shll16Rn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::ShlrRn { rn } => {
+            Self::ShlrRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Shlr2Rn { rn } => {
+            Self::Shlr2Rn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Shlr8Rn { rn } => {
+            Self::Shlr8Rn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Shlr16Rn { rn } => {
+            Self::Shlr16Rn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Bt { disp } => {
+            Self::Bt { disp } => {
                 out.write_space()?;
-                out.write_branch(*disp)?;
+                out.write_branch(
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add_signed(i32::from(disp.value()) * 2u32 as i32),
+                    ),
+                )?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::Bts { disp } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::Bts { disp } => {
                 out.write_space()?;
-                out.write_branch(*disp)?;
+                out.write_branch(
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add_signed(i32::from(disp.value()) * 2u32 as i32),
+                    ),
+                )?;
                 Ok(())
             }
-            Ins::Bf { disp } => {
+            Self::Bf { disp } => {
                 out.write_space()?;
-                out.write_branch(*disp)?;
+                out.write_branch(
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add_signed(i32::from(disp.value()) * 2u32 as i32),
+                    ),
+                )?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::Bfs { disp } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::Bfs { disp } => {
                 out.write_space()?;
-                out.write_branch(*disp)?;
+                out.write_branch(
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add_signed(i32::from(disp.value()) * 2u32 as i32),
+                    ),
+                )?;
                 Ok(())
             }
-            Ins::Bra { disp } => {
+            Self::Bra { disp } => {
                 out.write_space()?;
-                out.write_branch(*disp)?;
+                out.write_branch(
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add_signed(i32::from(disp.value()) * 2u32 as i32),
+                    ),
+                )?;
                 Ok(())
             }
-            Ins::Bsr { disp } => {
+            Self::Bsr { disp } => {
                 out.write_space()?;
-                out.write_branch(*disp)?;
+                out.write_branch(
+                    Address::new(
+                        address
+                            .wrapping_add(4u32)
+                            .wrapping_add_signed(i32::from(disp.value()) * 2u32 as i32),
+                    ),
+                )?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::BrafRn { rn } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::BrafRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh2")]
-            Ins::BsrfRn { rn } => {
+            #[cfg(any(feature = "sh2", feature = "sh3", feature = "sh4"))]
+            Self::BsrfRn { rn } => {
                 out.write_space()?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::JmpAtRn { rn } => {
+            Self::JmpAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::JsrAtRn { rn } => {
+            Self::JsrAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::Rts => Ok(()),
-            Ins::Rte => Ok(()),
-            Ins::Clrmac => Ok(()),
-            #[cfg(feature = "sh3")]
-            Ins::Clrs => Ok(()),
-            Ins::Clrt => Ok(()),
-            #[cfg(feature = "sh3")]
-            Ins::Sets => Ok(()),
-            Ins::Sett => Ok(()),
-            Ins::Nop => Ok(()),
-            Ins::Sleep => Ok(()),
-            #[cfg(feature = "sh3")]
-            Ins::Ldtlb => Ok(()),
-            Ins::Trapa { imm } => {
+            Self::Rts => Ok(()),
+            Self::Rte => Ok(()),
+            Self::Clrmac => Ok(()),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::Clrs => Ok(()),
+            Self::Clrt => Ok(()),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::Sets => Ok(()),
+            Self::Sett => Ok(()),
+            Self::Nop => Ok(()),
+            Self::Sleep => Ok(()),
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::Ldtlb => Ok(()),
+            Self::Trapa { imm } => {
                 out.write_space()?;
                 out.write_str("#")?;
                 out.write_uimm(*imm as u32)?;
                 Ok(())
             }
-            Ins::StcSrRn { rn } => {
+            Self::StcSrRn { rn } => {
                 out.write_space()?;
                 out.write_str("sr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StcGbrRn { rn } => {
+            Self::StcGbrRn { rn } => {
                 out.write_space()?;
                 out.write_str("gbr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StcVbrRn { rn } => {
+            Self::StcVbrRn { rn } => {
                 out.write_space()?;
                 out.write_str("vbr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StcSsrRn { rn } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StcSsrRn { rn } => {
                 out.write_space()?;
                 out.write_str("ssr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StcSpcRn { rn } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StcSpcRn { rn } => {
                 out.write_space()?;
                 out.write_str("spc, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StcDbrRn { rn } => {
+            Self::StcDbrRn { rn } => {
                 out.write_space()?;
                 out.write_str("dbr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StcSgrRn { rn } => {
+            Self::StcSgrRn { rn } => {
                 out.write_space()?;
                 out.write_str("sgr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StcBankRn { rn, bank } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StcBankRn { rn, bank } => {
                 out.write_space()?;
                 out.write_str("r")?;
-                write!(out, "{}", bank)?;
+                out.write_bank_reg(*bank)?;
                 out.write_str("_bank, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StcLoBank5Rn { rn } => {
-                out.write_space()?;
-                out.write_str("r5_bank, ")?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::StcLoBank6Rn { rn } => {
-                out.write_space()?;
-                out.write_str("r6_bank, ")?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::StcLoBank7Rn { rn } => {
-                out.write_space()?;
-                out.write_str("r7_bank, ")?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            Ins::StclSrAtDecRn { rn } => {
+            Self::StclSrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("sr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StclGbrAtDecRn { rn } => {
+            Self::StclGbrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("gbr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StclVbrAtDecRn { rn } => {
+            Self::StclVbrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("vbr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StclSsrAtDecRn { rn } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StclSsrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("ssr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StclSpcAtDecRn { rn } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StclSpcAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("spc, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StclDbrAtDecRn { rn } => {
+            Self::StclDbrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("dbr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StclSgrAtDecRn { rn } => {
+            Self::StclSgrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("sgr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StclBankAtDecRn { rn, bank } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::StclBankAtDecRn { rn, bank } => {
                 out.write_space()?;
                 out.write_str("r")?;
-                write!(out, "{}", bank)?;
+                out.write_bank_reg(*bank)?;
                 out.write_str("_bank, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::StclLoBank5AtDecRn { rn } => {
-                out.write_space()?;
-                out.write_str("r5_bank, @-")?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::StclLoBank6AtDecRn { rn } => {
-                out.write_space()?;
-                out.write_str("r6_bank, @-")?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::StclLoBank7AtDecRn { rn } => {
-                out.write_space()?;
-                out.write_str("r7_bank, @-")?;
-                out.write_reg(*rn)?;
-                Ok(())
-            }
-            Ins::LdcRmSr { rm } => {
+            Self::LdcRmSr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", sr")?;
                 Ok(())
             }
-            Ins::LdcRmGbr { rm } => {
+            Self::LdcRmGbr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", gbr")?;
                 Ok(())
             }
-            Ins::LdcRmVbr { rm } => {
+            Self::LdcRmVbr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", vbr")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmSsr { rm } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdcRmSsr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", ssr")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmSpc { rm } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdcRmSpc { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", spc")?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::LdcRmDbr { rm } => {
+            Self::LdcRmDbr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", dbr")?;
                 Ok(())
             }
-            #[cfg(feature = "sh4")]
-            Ins::LdcRmSgr { rm } => {
-                out.write_space()?;
-                out.write_reg(*rm)?;
-                out.write_str(", sgr")?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmBank { rm, bank } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdcRmBank { rm, bank } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", r")?;
-                write!(out, "{}", bank)?;
+                out.write_bank_reg(*bank)?;
                 out.write_str("_bank")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmLoBank5 { rm } => {
-                out.write_space()?;
-                out.write_reg(*rm)?;
-                out.write_str(", r5_bank")?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmLoBank6 { rm } => {
-                out.write_space()?;
-                out.write_reg(*rm)?;
-                out.write_str(", r6_bank")?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::LdcRmLoBank7 { rm } => {
-                out.write_space()?;
-                out.write_reg(*rm)?;
-                out.write_str(", r7_bank")?;
-                Ok(())
-            }
-            Ins::LdclAtRmIncSr { rm } => {
+            Self::LdclAtRmIncSr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, sr")?;
                 Ok(())
             }
-            Ins::LdclAtRmIncGbr { rm } => {
+            Self::LdclAtRmIncGbr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, gbr")?;
                 Ok(())
             }
-            Ins::LdclAtRmIncVbr { rm } => {
+            Self::LdclAtRmIncVbr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, vbr")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncSsr { rm } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdclAtRmIncSsr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, ssr")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncSpc { rm } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdclAtRmIncSpc { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -1452,166 +1440,134 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::LdclAtRmIncDbr { rm } => {
+            Self::LdclAtRmIncDbr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, dbr")?;
                 Ok(())
             }
-            #[cfg(feature = "sh4")]
-            Ins::LdclAtRmIncSgr { rm } => {
-                out.write_space()?;
-                out.write_str("@")?;
-                out.write_reg(*rm)?;
-                out.write_str("+, sgr")?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncBank { rm, bank } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::LdclAtRmIncBank { rm, bank } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, r")?;
-                write!(out, "{}", bank)?;
+                out.write_bank_reg(*bank)?;
                 out.write_str("_bank")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncLoBank5 { rm } => {
-                out.write_space()?;
-                out.write_str("@")?;
-                out.write_reg(*rm)?;
-                out.write_str("+, r5_bank")?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncLoBank6 { rm } => {
-                out.write_space()?;
-                out.write_str("@")?;
-                out.write_reg(*rm)?;
-                out.write_str("+, r6_bank")?;
-                Ok(())
-            }
-            #[cfg(feature = "sh3")]
-            Ins::LdclAtRmIncLoBank7 { rm } => {
-                out.write_space()?;
-                out.write_str("@")?;
-                out.write_reg(*rm)?;
-                out.write_str("+, r7_bank")?;
-                Ok(())
-            }
-            Ins::StsMachRn { rn } => {
+            Self::StsMachRn { rn } => {
                 out.write_space()?;
                 out.write_str("mach, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StsMaclRn { rn } => {
+            Self::StsMaclRn { rn } => {
                 out.write_space()?;
                 out.write_str("macl, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StsPrRn { rn } => {
+            Self::StsPrRn { rn } => {
                 out.write_space()?;
                 out.write_str("pr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StsFpscrRn { rn } => {
+            Self::StsFpscrRn { rn } => {
                 out.write_space()?;
                 out.write_str("fpscr, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StsFpulRn { rn } => {
+            Self::StsFpulRn { rn } => {
                 out.write_space()?;
                 out.write_str("fpul, ")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StslMachAtDecRn { rn } => {
+            Self::StslMachAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("mach, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StslMaclAtDecRn { rn } => {
+            Self::StslMaclAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("macl, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::StslPrAtDecRn { rn } => {
+            Self::StslPrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("pr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StslFpscrAtDecRn { rn } => {
+            Self::StslFpscrAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("fpscr, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::StslFpulAtDecRn { rn } => {
+            Self::StslFpulAtDecRn { rn } => {
                 out.write_space()?;
                 out.write_str("fpul, @-")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
-            Ins::LdsRmMach { rm } => {
+            Self::LdsRmMach { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", mach")?;
                 Ok(())
             }
-            Ins::LdsRmMacl { rm } => {
+            Self::LdsRmMacl { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", macl")?;
                 Ok(())
             }
-            Ins::LdsRmPr { rm } => {
+            Self::LdsRmPr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", pr")?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::LdsRmFpscr { rm } => {
+            Self::LdsRmFpscr { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", fpscr")?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::LdsRmFpul { rm } => {
+            Self::LdsRmFpul { rm } => {
                 out.write_space()?;
                 out.write_reg(*rm)?;
                 out.write_str(", fpul")?;
                 Ok(())
             }
-            Ins::LdslAtRmIncMach { rm } => {
+            Self::LdslAtRmIncMach { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, mach")?;
                 Ok(())
             }
-            Ins::LdslAtRmIncMacl { rm } => {
+            Self::LdslAtRmIncMacl { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, macl")?;
                 Ok(())
             }
-            Ins::LdslAtRmIncPr { rm } => {
+            Self::LdslAtRmIncPr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -1619,7 +1575,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::LdslAtRmIncFpscr { rm } => {
+            Self::LdslAtRmIncFpscr { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -1627,43 +1583,43 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::LdslAtRmIncFpul { rm } => {
+            Self::LdslAtRmIncFpul { rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
                 out.write_str("+, fpul")?;
                 Ok(())
             }
-            #[cfg(feature = "sh3")]
-            Ins::PrefAtRn { rn } => {
+            #[cfg(any(feature = "sh3", feature = "sh4"))]
+            Self::PrefAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::OcbiAtRn { rn } => {
+            Self::OcbiAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::OcbpAtRn { rn } => {
+            Self::OcbpAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::OcbwbAtRn { rn } => {
+            Self::OcbwbAtRn { rn } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FaddFrmFrn { frn, frm } => {
+            Self::FaddFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1671,7 +1627,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FsubFrmFrn { frn, frm } => {
+            Self::FsubFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1679,7 +1635,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmulFrmFrn { frn, frm } => {
+            Self::FmulFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1687,7 +1643,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FdivFrmFrn { frn, frm } => {
+            Self::FdivFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1695,7 +1651,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FcmpeqFrmFrn { frn, frm } => {
+            Self::FcmpeqFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1703,7 +1659,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FcmpgtFrmFrn { frn, frm } => {
+            Self::FcmpgtFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1711,7 +1667,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovAtR0RmFrn { frn, rm } => {
+            Self::FmovAtR0RmFrn { frn, rm } => {
                 out.write_space()?;
                 out.write_str("@(r0, ")?;
                 out.write_reg(*rm)?;
@@ -1720,7 +1676,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmAtR0Rn { rn, frm } => {
+            Self::FmovFrmAtR0Rn { rn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_str(", @(r0, ")?;
@@ -1729,7 +1685,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovAtRmFrn { frn, rm } => {
+            Self::FmovAtRmFrn { frn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -1738,7 +1694,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovAtRmIncFrn { frn, rm } => {
+            Self::FmovAtRmIncFrn { frn, rm } => {
                 out.write_space()?;
                 out.write_str("@")?;
                 out.write_reg(*rm)?;
@@ -1747,7 +1703,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmAtRn { rn, frm } => {
+            Self::FmovFrmAtRn { rn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_str(", @")?;
@@ -1755,7 +1711,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmAtDecRn { rn, frm } => {
+            Self::FmovFrmAtDecRn { rn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_str(", @-")?;
@@ -1763,7 +1719,7 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmovFrmFrn { frn, frm } => {
+            Self::FmovFrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_freg(*frm)?;
                 out.write_separator()?;
@@ -1771,65 +1727,65 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FstsFpulFrn { frn } => {
+            Self::FstsFpulFrn { frn } => {
                 out.write_space()?;
                 out.write_str("fpul, ")?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FldsFrnFpul { frn } => {
+            Self::FldsFrnFpul { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 out.write_str(", fpul")?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FloatFpulFrn { frn } => {
+            Self::FloatFpulFrn { frn } => {
                 out.write_space()?;
                 out.write_str("fpul, ")?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FtrcFrnFpul { frn } => {
+            Self::FtrcFrnFpul { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 out.write_str(", fpul")?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FnegFrn { frn } => {
+            Self::FnegFrn { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FabsFrn { frn } => {
+            Self::FabsFrn { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FsqrtFrn { frn } => {
+            Self::FsqrtFrn { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::Fldi0Frn { frn } => {
+            Self::Fldi0Frn { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::Fldi1Frn { frn } => {
+            Self::Fldi1Frn { frn } => {
                 out.write_space()?;
                 out.write_freg(*frn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FmacFr0FrmFrn { frn, frm } => {
+            Self::FmacFr0FrmFrn { frn, frm } => {
                 out.write_space()?;
                 out.write_str("fr0, ")?;
                 out.write_freg(*frm)?;
@@ -1838,21 +1794,21 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FcnvsdFpulDrn { drn } => {
+            Self::FcnvsdFpulDrn { drn } => {
                 out.write_space()?;
                 out.write_str("fpul, ")?;
                 out.write_dreg(*drn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FcnvdsDrnFpul { drn } => {
+            Self::FcnvdsDrnFpul { drn } => {
                 out.write_space()?;
                 out.write_dreg(*drn)?;
                 out.write_str(", fpul")?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FiprFvmFvn { fvn, fvm } => {
+            Self::FiprFvmFvn { fvn, fvm } => {
                 out.write_space()?;
                 out.write_vecreg(*fvm)?;
                 out.write_separator()?;
@@ -1860,41 +1816,16 @@ impl Ins {
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FtrvXmtrxFvn { fvn } => {
+            Self::FtrvXmtrxFvn { fvn } => {
                 out.write_space()?;
                 out.write_str("xmtrx, ")?;
                 out.write_vecreg(*fvn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]
-            Ins::FsrraFrn { frn } => {
-                out.write_space()?;
-                out.write_freg(*frn)?;
-                Ok(())
-            }
+            Self::Fschg => Ok(()),
             #[cfg(feature = "sh4")]
-            Ins::FscaFpulDrn { drn } => {
-                out.write_space()?;
-                out.write_str("fpul, ")?;
-                out.write_dreg(*drn)?;
-                Ok(())
-            }
-            #[cfg(feature = "sh4")]
-            Ins::Fschg => Ok(()),
-            #[cfg(feature = "sh4")]
-            Ins::Frchg => Ok(()),
-            Ins::Word(w) => {
-                out.write_space()?;
-                write!(out, "0x{:04x}", w)
-            }
-            Ins::Byte(b) => {
-                out.write_space()?;
-                write!(out, "0x{:02x}", b)
-            }
-            Ins::Long(l) => {
-                out.write_space()?;
-                write!(out, "0x{:08x}", l)
-            }
+            Self::Frchg => Ok(()),
         }
     }
 }

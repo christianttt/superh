@@ -1,270 +1,237 @@
-use crate::isa::{FieldType, Isa, Opcode, SHVersion};
+use crate::generate::types::architecture_cfg;
+use crate::isa::{FieldType, Isa, Opcode};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 pub fn generate_display(isa: &Isa) -> TokenStream {
-    let format_ins_trait = gen_format_ins_trait();
-    let opcode_arms = gen_write_opcode(isa);
-    let params_arms = gen_write_params(isa);
-
+    let opcodes = isa.opcodes.iter().map(opcode_arm);
+    let params = isa.opcodes.iter().map(params_arm);
     quote! {
-        use crate::{BranchTarget, Ins, Options};
+        use crate::{Address, Disp, FormatOptions, ImmediateRadix, Ins, Reg};
+        #[cfg(feature = "sh3")]
+        use crate::BankReg;
         #[cfg(feature = "sh4")]
         use crate::{DReg, FReg, VecReg};
-        use crate::Reg;
 
-        #format_ins_trait
+        /// Structured instruction formatting callbacks.
+        pub trait FormatIns: core::fmt::Write {
+            /// Return rendering-only options.
+            fn options(&self) -> &FormatOptions;
+            /// Write the gap between mnemonic and operands.
+            fn write_space(&mut self) -> core::fmt::Result { self.write_str(" ") }
+            /// Write an operand separator.
+            fn write_separator(&mut self) -> core::fmt::Result { self.write_str(", ") }
+            /// Write a general-purpose register.
+            fn write_reg(&mut self, reg: Reg) -> core::fmt::Result { self.write_str(reg.name()) }
+            #[cfg(feature = "sh3")]
+            /// Write a banked register.
+            fn write_bank_reg(&mut self, reg: BankReg) -> core::fmt::Result {
+                write!(self, "r{}_bank", reg.number())
+            }
+            #[cfg(feature = "sh4")]
+            /// Write a single-precision register view.
+            fn write_freg(&mut self, reg: FReg) -> core::fmt::Result { self.write_str(reg.name()) }
+            #[cfg(feature = "sh4")]
+            /// Write a double-precision register view.
+            fn write_dreg(&mut self, reg: DReg) -> core::fmt::Result { self.write_str(reg.name()) }
+            #[cfg(feature = "sh4")]
+            /// Write a vector register view.
+            fn write_vecreg(&mut self, reg: VecReg) -> core::fmt::Result { self.write_str(reg.name()) }
+            /// Write an unsigned immediate.
+            fn write_uimm(&mut self, value: u32) -> core::fmt::Result {
+                match self.options().immediate_radix {
+                    ImmediateRadix::Decimal => write!(self, "{value}"),
+                    ImmediateRadix::Hexadecimal => write!(self, "0x{value:x}"),
+                }
+            }
+            /// Write a signed immediate.
+            fn write_simm(&mut self, value: i32) -> core::fmt::Result {
+                match self.options().immediate_radix {
+                    ImmediateRadix::Decimal => write!(self, "{value}"),
+                    ImmediateRadix::Hexadecimal if value < 0 => {
+                        write!(self, "-0x{:x}", value.unsigned_abs())
+                    }
+                    ImmediateRadix::Hexadecimal => write!(self, "0x{value:x}"),
+                }
+            }
+            /// Write an encoded displacement and its scaled value.
+            fn write_displacement(&mut self, _encoded: Disp, value: u32) -> core::fmt::Result {
+                self.write_uimm(value)
+            }
+            /// Write a resolved PC-relative operand.
+            fn write_pc_relative(&mut self, _encoded: Disp, target: Address) -> core::fmt::Result {
+                self.write_uimm(target.value())
+            }
+            /// Write a resolved direct branch destination.
+            fn write_branch(&mut self, target: Address) -> core::fmt::Result {
+                write!(self, "0x{:x}", target.value())
+            }
+            /// Write a complete instruction at an address.
+            fn write_ins(&mut self, ins: &Ins, address: u32) -> core::fmt::Result {
+                ins.write_opcode(self)?;
+                ins.write_params_at(self, address)
+            }
+        }
 
         impl Ins {
+            /// Write only the mnemonic.
             pub fn write_opcode<W: FormatIns + ?Sized>(&self, out: &mut W) -> core::fmt::Result {
-                match self {
-                    #(#opcode_arms,)*
-                    Ins::Word(_) => out.write_str(".word"),
-                    Ins::Byte(_) => out.write_str(".byte"),
-                    Ins::Long(_) => out.write_str(".long"),
-                }
+                match self { #(#opcodes,)* }
             }
-
-            pub fn write_params<W: FormatIns + ?Sized>(&self, out: &mut W) -> core::fmt::Result {
-                match self {
-                    #(#params_arms,)*
-                    Ins::Word(w) => { out.write_space()?; write!(out, "0x{:04x}", w) }
-                    Ins::Byte(b) => { out.write_space()?; write!(out, "0x{:02x}", b) }
-                    Ins::Long(l) => { out.write_space()?; write!(out, "0x{:08x}", l) }
-                }
+            /// Write only the operands, resolving location-dependent values at `address`.
+            pub fn write_params_at<W: FormatIns + ?Sized>(
+                &self,
+                out: &mut W,
+                address: u32,
+            ) -> core::fmt::Result {
+                match self { #(#params,)* }
             }
         }
     }
 }
 
-fn gen_format_ins_trait() -> TokenStream {
-    quote! {
-        pub trait FormatIns: core::fmt::Write {
-            fn options(&self) -> &Options;
-
-            fn write_space(&mut self) -> core::fmt::Result {
-                self.write_str(" ")
-            }
-
-            fn write_separator(&mut self) -> core::fmt::Result {
-                self.write_str(", ")
-            }
-
-            fn write_reg(&mut self, reg: Reg) -> core::fmt::Result {
-                self.write_str(reg.name())
-            }
-
-            #[cfg(feature = "sh4")]
-            fn write_freg(&mut self, reg: FReg) -> core::fmt::Result {
-                self.write_str(reg.name())
-            }
-
-            #[cfg(feature = "sh4")]
-            fn write_dreg(&mut self, reg: DReg) -> core::fmt::Result {
-                self.write_str(reg.name())
-            }
-
-            #[cfg(feature = "sh4")]
-            fn write_vecreg(&mut self, reg: VecReg) -> core::fmt::Result {
-                self.write_str(reg.name())
-            }
-
-            fn write_uimm(&mut self, v: u32) -> core::fmt::Result {
-                if self.options().imm_decimal {
-                    write!(self, "{v}")
-                } else {
-                    write!(self, "0x{v:x}")
-                }
-            }
-
-            fn write_simm(&mut self, v: i32) -> core::fmt::Result {
-                if self.options().imm_decimal {
-                    write!(self, "{v}")
-                } else if v < 0 {
-                    write!(self, "-0x{:x}", -v)
-                } else {
-                    write!(self, "0x{v:x}")
-                }
-            }
-
-            fn write_branch(&mut self, target: BranchTarget) -> core::fmt::Result {
-                write!(self, "0x{:x}", target.addr)
-            }
-
-            fn write_ins(&mut self, ins: &Ins) -> core::fmt::Result {
-                ins.write_opcode(self)?;
-                ins.write_params(self)?;
-                Ok(())
-            }
-        }
-    }
+fn opcode_arm(op: &Opcode) -> TokenStream {
+    let name = format_ident!("{}", op.name);
+    let cfg = architecture_cfg(op);
+    let mnemonic = &op.opcode;
+    let pattern = if op.fields.is_empty() {
+        quote! { Self::#name }
+    } else {
+        quote! { Self::#name { .. } }
+    };
+    quote! { #cfg #pattern => out.write_str(#mnemonic) }
 }
 
-fn gen_write_opcode(isa: &Isa) -> Vec<TokenStream> {
-    isa.opcodes
-        .iter()
-        .map(|op| {
-            let name = format_ident!("{}", op.name);
-            let cfg = version_cfg(op.version);
-            let opcode_str = &op.opcode;
-            let pat = if op.fields.is_empty() {
-                quote! { Ins::#name }
-            } else {
-                quote! { Ins::#name { .. } }
-            };
-            quote! {
-                #cfg
-                #pat => out.write_str(#opcode_str)
-            }
-        })
-        .collect()
+fn params_arm(op: &Opcode) -> TokenStream {
+    let name = format_ident!("{}", op.name);
+    let cfg = architecture_cfg(op);
+    let fields: Vec<_> =
+        op.fields.keys().map(|letter| format_ident!("{}", op.letter_to_param(*letter))).collect();
+    let pattern = if fields.is_empty() {
+        quote! { Self::#name }
+    } else {
+        quote! { Self::#name { #(#fields,)* } }
+    };
+    let body = params_body(op);
+    quote! { #cfg #pattern => { #body Ok(()) } }
 }
 
-fn gen_write_params(isa: &Isa) -> Vec<TokenStream> {
-    isa.opcodes
-        .iter()
-        .map(|op| {
-            let name = format_ident!("{}", op.name);
-            let cfg = version_cfg(op.version);
-
-            let field_names: Vec<_> = op
-                .fields
-                .keys()
-                .map(|letter| format_ident!("{}", op.letter_to_param(*letter)))
-                .collect();
-
-            let pat = if field_names.is_empty() {
-                quote! { Ins::#name }
-            } else {
-                quote! { Ins::#name { #(#field_names,)* } }
-            };
-
-            let body = gen_params_body(op);
-
-            quote! {
-                #cfg
-                #pat => { #body Ok(()) }
-            }
-        })
-        .collect()
-}
-
-fn gen_params_body(op: &Opcode) -> TokenStream {
+fn params_body(op: &Opcode) -> TokenStream {
     if op.args.is_empty() {
         return quote! {};
     }
-
-    let segments = parse_format_string(&op.args);
-    let mut stmts: Vec<TokenStream> = Vec::new();
-
-    // Leading space before the first argument
-    stmts.push(quote! { out.write_space()?; });
-
-    for seg in &segments {
-        match seg {
-            Segment::Literal(s) if s == ", " => {
-                stmts.push(quote! { out.write_separator()?; });
+    let mut statements = vec![quote! { out.write_space()?; }];
+    for segment in parse_format(&op.args) {
+        match segment {
+            Segment::Literal(value) if value == ", " => {
+                statements.push(quote! { out.write_separator()?; })
             }
-            Segment::Literal(s) => {
-                stmts.push(quote! { out.write_str(#s)?; });
-            }
-            Segment::Placeholder(name) => {
-                stmts.push(gen_write_placeholder(name, op));
-            }
+            Segment::Literal(value) => statements.push(quote! { out.write_str(#value)?; }),
+            Segment::Placeholder(value) => statements.push(write_placeholder(&value, op)),
         }
     }
-
-    quote! { #(#stmts)* }
+    quote! { #(#statements)* }
 }
 
-fn gen_write_placeholder(name: &str, op: &Opcode) -> TokenStream {
-    let letter = op
-        .fields
-        .iter()
-        .find(|(l, _)| op.letter_to_param(**l) == name)
-        .map(|(l, ft)| (*l, ft.clone()));
-
-    match name {
-        "pc" => quote! { out.write_str("{pc}")?; },
-        _ => {
-            if let Some((_, ftype)) = letter {
-                let ident = format_ident!("{}", name);
-                match ftype {
-                    FieldType::Reg => quote! { out.write_reg(*#ident)?; },
-                    FieldType::Freg => quote! { out.write_freg(*#ident)?; },
-                    FieldType::Dreg => quote! { out.write_dreg(*#ident)?; },
-                    FieldType::Vecreg => quote! { out.write_vecreg(*#ident)?; },
-                    FieldType::Bankreg => {
-                        quote! { write!(out, "{}", #ident)?; }
+fn write_placeholder(name: &str, op: &Opcode) -> TokenStream {
+    if name == "pc" {
+        return quote! { out.write_str("pc")?; };
+    }
+    let (letter, field) =
+        op.fields.iter().find(|(letter, _)| op.letter_to_param(**letter) == name).unwrap_or_else(
+            || panic!("opcode '{}': validated placeholder '{name}' disappeared", op.name),
+        );
+    let ident = format_ident!("{}", name);
+    match field {
+        FieldType::Reg => quote! { out.write_reg(*#ident)?; },
+        FieldType::Freg => quote! { out.write_freg(*#ident)?; },
+        FieldType::Dreg => quote! { out.write_dreg(*#ident)?; },
+        FieldType::Vecreg => quote! { out.write_vecreg(*#ident)?; },
+        FieldType::Bankreg => quote! { out.write_bank_reg(*#ident)?; },
+        FieldType::Uimm => quote! { out.write_uimm(*#ident as u32)?; },
+        FieldType::Simm => quote! { out.write_simm(*#ident as i32)?; },
+        FieldType::Disp => {
+            let scale = op.scale.unwrap_or(1);
+            if let Some(bias) = op.pc_bias {
+                let align = if scale >= 4 { scale - 1 } else { 0 };
+                if align == 0 {
+                    quote! {
+                        out.write_pc_relative(
+                            *#ident,
+                            Address::new(
+                                address.wrapping_add(#bias)
+                                    .wrapping_add(u32::from(#ident.value()) * #scale)
+                            ),
+                        )?;
                     }
-                    FieldType::Uimm => quote! { out.write_uimm(*#ident as u32)?; },
-                    FieldType::Simm => quote! { out.write_simm(*#ident as i32)?; },
-                    FieldType::Disp => {
-                        let scale = op.scale.unwrap_or(1);
-                        if let Some(pc_bias) = op.pc_bias {
-                            if scale >= 4 {
-                                quote! { out.write_uimm(*#ident)?; }
-                            } else {
-                                quote! { out.write_uimm(*#ident as u32 * #scale + #pc_bias)?; }
-                            }
-                        } else if op.scale.is_some() {
-                            quote! { out.write_uimm(*#ident as u32 * #scale)?; }
-                        } else {
-                            quote! { out.write_uimm(*#ident as u32)?; }
-                        }
+                } else {
+                    quote! {
+                        out.write_pc_relative(
+                            *#ident,
+                            Address::new(
+                                address.wrapping_add(#bias)
+                                    .wrapping_sub(address & #align)
+                                    .wrapping_add(u32::from(#ident.value()) * #scale)
+                            ),
+                        )?;
                     }
-                    FieldType::BranchTarget => quote! { out.write_branch(*#ident)?; },
                 }
             } else {
-                let s = format!("{{{name}}}");
-                quote! { out.write_str(#s)?; }
+                quote! { out.write_displacement(*#ident, u32::from(#ident.value()) * #scale)?; }
+            }
+        }
+        FieldType::BranchTarget => {
+            let (high, low) = op.field_bits(*letter).expect("branch field must exist");
+            let width = high - low + 1;
+            let scale = op.scale.unwrap_or(1);
+            let bias = op.pc_bias.unwrap_or(0);
+            match width {
+                8 => quote! {
+                    out.write_branch(Address::new(
+                        address.wrapping_add(#bias)
+                            .wrapping_add_signed(i32::from(#ident.value()) * #scale as i32)
+                    ))?;
+                },
+                12 => quote! {
+                    out.write_branch(Address::new(
+                        address.wrapping_add(#bias)
+                            .wrapping_add_signed(i32::from(#ident.value()) * #scale as i32)
+                    ))?;
+                },
+                _ => unreachable!("validated branch width"),
             }
         }
     }
 }
 
-#[derive(Debug)]
 enum Segment {
     Literal(String),
     Placeholder(String),
 }
 
-fn parse_format_string(s: &str) -> Vec<Segment> {
+fn parse_format(value: &str) -> Vec<Segment> {
     let mut result = Vec::new();
-    let mut chars = s.chars().peekable();
-    let mut lit = String::new();
-
+    let mut chars = value.chars();
+    let mut literal = String::new();
     while let Some(ch) = chars.next() {
-        if ch == '{' {
-            if !lit.is_empty() {
-                result.push(Segment::Literal(lit.clone()));
-                lit.clear();
-            }
-            let mut placeholder = String::new();
-            for c in chars.by_ref() {
-                if c == '}' {
-                    break;
-                }
-                placeholder.push(c);
-            }
-            result.push(Segment::Placeholder(placeholder));
-        } else {
-            lit.push(ch);
+        if ch != '{' {
+            literal.push(ch);
+            continue;
         }
+        if !literal.is_empty() {
+            result.push(Segment::Literal(core::mem::take(&mut literal)));
+        }
+        let mut placeholder = String::new();
+        for next in chars.by_ref() {
+            if next == '}' {
+                break;
+            }
+            placeholder.push(next);
+        }
+        result.push(Segment::Placeholder(placeholder));
     }
-
-    if !lit.is_empty() {
-        result.push(Segment::Literal(lit));
+    if !literal.is_empty() {
+        result.push(Segment::Literal(literal));
     }
-
     result
-}
-
-fn version_cfg(v: SHVersion) -> TokenStream {
-    match v {
-        SHVersion::Sh1 => quote! {},
-        SHVersion::Sh2 => quote! { #[cfg(feature = "sh2")] },
-        SHVersion::Sh3 => quote! { #[cfg(feature = "sh3")] },
-        SHVersion::Sh4 => quote! { #[cfg(feature = "sh4")] },
-    }
 }

@@ -5,7 +5,7 @@ mod opcode;
 mod types;
 
 pub use opcode::Opcode;
-pub use types::{FieldType, SHVersion};
+pub use types::{Architecture, FieldType};
 
 /// Top-level ISA definition parsed from isa.yaml
 #[derive(Debug, Deserialize)]
@@ -18,9 +18,37 @@ impl Isa {
     /// errors before any code is generated.
     pub fn validate(&self) -> Result<()> {
         let mut seen_names = std::collections::HashSet::new();
+        let mut seen_ids = std::collections::HashSet::new();
         for op in &self.opcodes {
             if !seen_names.insert(&op.name) {
                 bail!("Duplicate opcode name: '{}'", op.name);
+            }
+            if !seen_ids.insert(op.id) {
+                bail!("Duplicate opcode id: {}", op.id);
+            }
+            if op.architectures.is_empty() {
+                bail!("Opcode '{}': architectures must not be empty", op.name);
+            }
+            if op.source.trim().is_empty() || !op.source.contains(":section-") {
+                bail!("Opcode '{}': invalid source citation '{}'", op.name, op.source);
+            }
+            let valid_source =
+                ["rej09b0171:section-6:", "sh3-rev4:section-8:", "rej09b0318:section-9:"]
+                    .iter()
+                    .any(|prefix| op.source.starts_with(prefix));
+            if !valid_source {
+                bail!("Opcode '{}': unknown source manual '{}'", op.name, op.source);
+            }
+            validate_mnemonic(op)?;
+            let mut seen_architectures = std::collections::HashSet::new();
+            for architecture in &op.architectures {
+                if !seen_architectures.insert(*architecture) {
+                    bail!(
+                        "Opcode '{}': duplicate architecture '{}'",
+                        op.name,
+                        architecture.feature()
+                    );
+                }
             }
 
             if op.pattern.len() != 16 {
@@ -65,6 +93,39 @@ impl Isa {
                 }
             }
 
+            for (&letter, field) in &op.fields {
+                let (high, low) = op.field_bits(letter).expect("validated field must exist");
+                let width = high - low + 1;
+                let valid_width = match field {
+                    FieldType::Reg | FieldType::Freg => width == 4,
+                    FieldType::Dreg | FieldType::Bankreg => width == 3,
+                    FieldType::Vecreg => width == 2,
+                    FieldType::Simm => width == 8,
+                    FieldType::Uimm | FieldType::Disp => matches!(width, 4 | 8),
+                    FieldType::BranchTarget => matches!(width, 8 | 12),
+                };
+                if !valid_width {
+                    bail!(
+                        "Opcode '{}': field '{}' has invalid width {} for {:?}",
+                        op.name,
+                        letter,
+                        width,
+                        field
+                    );
+                }
+            }
+
+            if op.pc_bias.is_some()
+                && !op
+                    .fields
+                    .values()
+                    .any(|field| matches!(field, FieldType::Disp | FieldType::BranchTarget))
+            {
+                bail!("Opcode '{}': pc_bias requires a displacement field", op.name);
+            }
+
+            validate_format(op)?;
+
             let param_names: std::collections::HashSet<String> =
                 op.fields.keys().map(|&l| op.letter_to_param(l)).collect();
             for reg in op.defs.iter().chain(op.uses.iter()) {
@@ -80,9 +141,7 @@ impl Isa {
         }
 
         // No two patterns may match the same instruction word. Overlaps make the
-        // decode order-dependent, and the generated version check returns
-        // `Ins::Word` without falling through to other matching patterns — an
-        // overlapping pair would silently mis-decode for older SH versions.
+        // decode order-dependent, so the schema rejects them globally.
         for (i, a) in self.opcodes.iter().enumerate() {
             let (mask_a, value_a) = a.mask_value();
             for b in &self.opcodes[i + 1..] {
@@ -103,31 +162,92 @@ impl Isa {
     }
 }
 
+fn validate_mnemonic(op: &Opcode) -> Result<()> {
+    let cited_mnemonic = op.source.rsplit(':').next().expect("validated source contains a colon");
+    let grouped_fmov_citation = op.opcode == "fmov.s" && cited_mnemonic == "fmov";
+    if cited_mnemonic != op.opcode && !grouped_fmov_citation {
+        bail!(
+            "Opcode '{}': mnemonic '{}' does not match source citation '{}'",
+            op.name,
+            op.opcode,
+            cited_mnemonic
+        );
+    }
+
+    let manual_mnemonic = match op.name.as_str() {
+        "Bts" => Some("bt/s"),
+        "Bfs" => Some("bf/s"),
+        name if name.starts_with("Fmov") => {
+            Some(if op.args.contains('@') { "fmov.s" } else { "fmov" })
+        }
+        _ => None,
+    };
+    if let Some(manual_mnemonic) = manual_mnemonic
+        && op.opcode != manual_mnemonic
+    {
+        bail!(
+            "Opcode '{}': manual mnemonic is '{}', found '{}'",
+            op.name,
+            manual_mnemonic,
+            op.opcode
+        );
+    }
+    Ok(())
+}
+
+fn validate_format(op: &Opcode) -> Result<()> {
+    let mut chars = op.args.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '}' {
+            bail!("Opcode '{}': unmatched '}}' in args", op.name);
+        }
+        if ch != '{' {
+            continue;
+        }
+        let mut placeholder = String::new();
+        let mut closed = false;
+        for next in chars.by_ref() {
+            if next == '}' {
+                closed = true;
+                break;
+            }
+            if next == '{' {
+                bail!("Opcode '{}': nested '{{' in args", op.name);
+            }
+            placeholder.push(next);
+        }
+        if !closed {
+            bail!("Opcode '{}': unclosed placeholder in args", op.name);
+        }
+        let known = placeholder == "pc"
+            || op.fields.keys().any(|letter| op.letter_to_param(*letter) == placeholder);
+        if !known {
+            bail!("Opcode '{}': unknown placeholder '{{{}}}' in args", op.name, placeholder);
+        }
+    }
+    Ok(())
+}
+
 /// Returns `true` if `name` is a recognised literal register name that can
 /// appear in a `defs`/`uses` list without being a pattern field.
 fn is_known_literal(name: &str) -> bool {
-    if let Some(rest) = name.strip_prefix('r')
-        && let Ok(n) = rest.parse::<u8>()
-        && n < 16
+    if name.strip_prefix('r').and_then(|rest| rest.parse::<u8>().ok()).is_some_and(|n| n < 16) {
+        return true;
+    }
+    if name.strip_prefix("fr").and_then(|rest| rest.parse::<u8>().ok()).is_some_and(|n| n < 16) {
+        return true;
+    }
+    if name
+        .strip_prefix("dr")
+        .and_then(|rest| rest.parse::<u8>().ok())
+        .is_some_and(|n| n < 16 && n % 2 == 0)
     {
         return true;
     }
-    if let Some(rest) = name.strip_prefix("fr")
-        && let Ok(n) = rest.parse::<u8>()
-        && n < 16
-    {
-        return true;
-    }
-    if let Some(rest) = name.strip_prefix("dr")
-        && let Ok(n) = rest.parse::<u8>()
-        && n < 16
-        && n % 2 == 0
-    {
-        return true;
-    }
-    if let Some(rest) = name.strip_prefix("fv")
-        && let Ok(n) = rest.parse::<u8>()
-        && matches!(n, 0 | 4 | 8 | 12)
+    if name
+        .strip_prefix("fv")
+        .and_then(|rest| rest.parse::<u8>().ok())
+        .is_some_and(|n| matches!(n, 0 | 4 | 8 | 12))
     {
         return true;
     }
@@ -145,5 +265,114 @@ fn is_known_literal(name: &str) -> bool {
             | "fpul"
             | "fpscr"
             | "t"
+            | "s"
+            | "q"
+            | "m"
+            | "xmtrx"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+
+    use super::*;
+
+    fn opcode(id: u16, name: &str, mnemonic: &str, pattern: &str) -> Opcode {
+        Opcode {
+            id,
+            name: name.to_owned(),
+            opcode: mnemonic.to_owned(),
+            args: String::new(),
+            architectures: Architecture::ALL.to_vec(),
+            source: format!("rej09b0171:section-6:{mnemonic}"),
+            pattern: pattern.to_owned(),
+            fields: IndexMap::new(),
+            scale: None,
+            pc_bias: None,
+            defs: Vec::new(),
+            uses: Vec::new(),
+        }
+    }
+
+    fn validation_error(opcodes: Vec<Opcode>) -> String {
+        Isa { opcodes }.validate().expect_err("invalid ISA").to_string()
+    }
+
+    #[test]
+    fn accepts_a_well_formed_isa() {
+        let isa = Isa { opcodes: vec![opcode(0, "Nop", "nop", "0000000000001001")] };
+        isa.validate().expect("valid ISA");
+    }
+
+    #[test]
+    fn rejects_duplicate_names_and_ids() {
+        let duplicate_name = validation_error(vec![
+            opcode(0, "Nop", "nop", "0000000000001001"),
+            opcode(1, "Nop", "sleep", "0000000000011011"),
+        ]);
+        assert!(duplicate_name.contains("Duplicate opcode name"));
+
+        let duplicate_id = validation_error(vec![
+            opcode(0, "Nop", "nop", "0000000000001001"),
+            opcode(0, "Sleep", "sleep", "0000000000011011"),
+        ]);
+        assert!(duplicate_id.contains("Duplicate opcode id"));
+    }
+
+    #[test]
+    fn rejects_overlapping_encodings() {
+        let error = validation_error(vec![
+            opcode(0, "Nop", "nop", "0000000000001001"),
+            opcode(1, "Sleep", "sleep", "0000000000001001"),
+        ]);
+        assert!(error.contains("overlap"));
+    }
+
+    #[test]
+    fn rejects_malformed_patterns_and_placeholders() {
+        let malformed = validation_error(vec![opcode(0, "Nop", "nop", "00001001")]);
+        assert!(malformed.contains("expected 16"));
+
+        let mut placeholder = opcode(0, "Nop", "nop", "0000000000001001");
+        placeholder.args = "{rn}".to_owned();
+        let error = validation_error(vec![placeholder]);
+        assert!(error.contains("unknown placeholder"));
+    }
+
+    #[test]
+    fn rejects_unknown_effect_resources() {
+        let mut invalid = opcode(0, "Nop", "nop", "0000000000001001");
+        invalid.uses.push("mystery_register".to_owned());
+        let error = validation_error(vec![invalid]);
+        assert!(error.contains("unknown register"));
+    }
+
+    #[test]
+    fn rejects_mnemonic_and_manual_spelling_drift() {
+        let mut citation_mismatch = opcode(0, "Nop", "nop", "0000000000001001");
+        citation_mismatch.source = "rej09b0171:section-6:sleep".to_owned();
+        let error = validation_error(vec![citation_mismatch]);
+        assert!(error.contains("does not match source citation"));
+
+        let mut fmov = opcode(1, "FmovAtRmFrn", "fmov", "1111000011111000");
+        fmov.args = "@r15, fr0".to_owned();
+        fmov.source = "rej09b0318:section-9:fmov".to_owned();
+        fmov.architectures = vec![Architecture::Sh4];
+        let error = validation_error(vec![fmov]);
+        assert!(error.contains("manual mnemonic is 'fmov.s'"));
+    }
+
+    #[test]
+    fn rejects_missing_architectures_and_unknown_manuals() {
+        let mut missing_architectures = opcode(0, "Nop", "nop", "0000000000001001");
+        missing_architectures.architectures.clear();
+        let error = validation_error(vec![missing_architectures]);
+        assert!(error.contains("architectures must not be empty"));
+
+        let mut unknown_manual = opcode(0, "Nop", "nop", "0000000000001001");
+        unknown_manual.source = "unknown:section-6:nop".to_owned();
+        let error = validation_error(vec![unknown_manual]);
+        assert!(error.contains("unknown source manual"));
+    }
 }

@@ -1,221 +1,164 @@
 # superh
 
-Parser for the SuperH (SH) instruction set, inspired by [unarm](https://github.com/AetiasHax/unarm). It currently supports the following versions:
+`superh` is a `no_std` decoder, formatter, and analysis library for the 16-bit
+SH-1, SH-2, SH-3, and SH-4 instruction sets. Decode behavior is generated from
+`generator/assets/isa.yaml`; unknown words and raw data are deliberately not
+represented as valid instructions.
 
-- SH1
-- SH2
-- SH3
-- SH4 (including FPU)
+## Decode and display
 
-## Contents
-
-- [About](#about)
-- [Performance](#performance)
-- [Usage](#usage)
-  - [Parsing one instruction](#parsing-one-instruction)
-  - [Streaming disassembly with Parser](#streaming-disassembly-with-parser)
-  - [Register def/use analysis](#register-defuse-analysis)
-  - [The FormatIns trait](#the-formatins-trait)
-  - [Branch delay slots](#branch-delay-slots)
-  - [Feature flags](#feature-flags)
-
-## About
-
-- Most of the parser is generated from `isa.yaml` by the `/generator/` module.
-- It accepts all 2<sup>16</sup> possible SuperH instruction words without errors.
-- Unrecognised encodings are returned as `Ins::Word(u16)` and displayed as `.word 0xXXXX`.
-- No promises that the output is 100% correct.
-  - Some illegal instructions may not be parsed as illegal.
-  - Some instructions may not stringify correctly.
-  - (more, probably)
-- `no_std` compatible — the core crate depends only on `alloc`.
-
-## Performance
-
-Tested on all 2<sup>16</sup> SH instruction words using the `/fuzz/` module.
-
-```bash
-cargo run -p superh-fuzz --release -- parse         # exhaustive parse
-cargo run -p superh-fuzz --release -- parse_random  # random instruction words
-cargo run -p superh-fuzz --release -- display       # parse + stringify
-cargo run -p superh-fuzz --release -- reparse       # determinism check
-cargo run -p superh-fuzz --release -- defs          # def/use analysis
-cargo run -p superh-fuzz --release -- uses          # use analysis
-cargo run -p superh-fuzz --release -- dump          # dump all 65536 results to stdout
-```
-
-Flags: `-t <threads>`, `-n <iterations>`, `--pc <hex_addr>` (repeatable).
-
-A differential test against the [`sh4dis`](https://pypi.org/project/sh4dis/) Python reference is also provided:
-
-```bash
-pip install sh4dis
-python3 fuzz/diff_sh4dis.py
-```
-
-## Usage
-
-### Parsing one instruction
+Decoding is location-independent. Attach an address only when resolving or
+formatting PC-relative operands.
 
 ```rust
-use superh::{parse, Ins, Options, Reg};
+use superh::{DecodeOptions, DecodeResult, FormatOptions, Ins, Reg, decode};
 
-let pc = 0;
-let options = Options::default();
-let ins = parse(0x6323, pc, &options);
-assert_eq!(
-    ins,
-    Ins::MovRmRn {
-        rn: Reg::R3,
-        rm: Reg::R2,
-    }
+let result = decode(0x6323, &DecodeOptions::default());
+let DecodeResult::Instruction(ins) = result else { panic!("known instruction") };
+assert_eq!(ins, Ins::MovRmRn { rn: Reg::R3, rm: Reg::R2 });
+assert_eq!(ins.encode(), Some(0x6323));
+assert_eq!(ins.at(0x8c01_0000).display(&FormatOptions::default()).to_string(), "mov r2, r3");
+```
+
+Typed instruction values can be encoded directly without a textual assembler.
+For every valid encoding, decoding and encoding preserves the exact 16-bit word.
+Encoding returns `None` if an operand in a manually constructed instruction does
+not fit that variant's bit field.
+
+Unknown encodings retain the original word:
+
+```rust
+use superh::{DecodeOptions, DecodeResult, FormatOptions, decode};
+
+let result = decode(0xffff, &DecodeOptions::default());
+assert_eq!(result, DecodeResult::Unknown(0xffff));
+assert_eq!(result.display_at(0, &FormatOptions::default()).to_string(), ".word 0xffff");
+```
+
+Every valid instruction exposes a stable, non-reused `OpcodeId`. The ID can be
+stored by downstream tools and checked with `Opcode::from_id`. If a consumer
+already has that opcode, `Opcode::decode` reconstructs the typed operands without
+repeating the full opcode search. It still validates the word and selected
+architecture, returning `None` if either does not match.
+
+```rust
+use superh::{DecodeOptions, Opcode};
+
+let instruction = Opcode::MovRmRn
+    .decode(0x6323, &DecodeOptions::default())
+    .expect("matching encoding");
+assert_eq!(instruction.opcode(), Opcode::MovRmRn);
+```
+
+## Streaming parser
+
+`Parser` yields source offset, mapped address, byte size, the original word,
+and the decode result. Data mode yields a separate `Data` type.
+
+```rust
+use superh::{DecodeOptions, ParseEndian, ParseMode, ParsedValue, Parser};
+
+let bytes = [0xe0, 0x01, 0x63, 0x23];
+let mut parser = Parser::new(
+    &bytes,
+    ParseMode::Instruction,
+    ParseEndian::Big,
+    DecodeOptions::default(),
 );
-assert_eq!(ins.display(&options).to_string(), "mov r2, r3");
-```
+parser.set_address(0x8c01_0000);
 
-PC-relative instructions use the `pc` argument to compute the effective display address:
-
-```rust
-use superh::{parse, Ins, Options};
-
-// mov.l @(0x4, pc), r0  at pc = 0x1000
-// EA = 0*4 + (0x1000 & !3) + 4 = 0x1004; display offset = EA - pc = 4
-let ins = parse(0xd000, 0x1000, &Options::default());
-assert_eq!(ins.display(&Options::default()).to_string(), "mov.l @(0x4, pc), r0");
-```
-
-Unrecognised encodings are returned as `Ins::Word` rather than an error:
-
-```rust
-use superh::{parse, Ins, Options};
-
-let ins = parse(0xffff, 0, &Options::default());
-assert_eq!(ins, Ins::Word(0xffff));
-assert_eq!(ins.display(&Options::default()).to_string(), ".word 0xffff");
-```
-
-### Streaming disassembly with Parser
-
-`Parser<'a>` is an iterator over `Ins` values. It reads two bytes at a time,
-advances the program counter automatically, and handles both big-endian and
-little-endian byte order.
-
-```rust
-use superh::{Options, ParseEndian, ParseMode, Parser};
-
-let bytes: &[u8] = &[0xe0, 0x01, 0x63, 0x23]; // mov #1, r0 / mov r2, r3
-let opts = Options::default();
-let mut parser = Parser::new(bytes, ParseMode::Instruction, ParseEndian::Big, opts.clone());
-parser.set_pc(0x8c01_0000);
-
-// parser.pc() points past the last decoded instruction, so subtract 2 to get its address.
-while let Some(ins) = parser.next() {
-    println!("{:08x}: {}", parser.pc() - 2, ins.display(&opts));
+for item in parser {
+    if let ParsedValue::Instruction { result, .. } = item.value {
+        println!("{:08x}: {:?}", item.address, result);
+    }
 }
-// 8c010000: mov #0x1, r0
-// 8c010002: mov r2, r3
 ```
 
-### Register def/use analysis
+Seeking changes only the buffer offset; the mapped address remains
+`base_address + offset`, with 32-bit wrapping semantics.
 
-Every decoded instruction exposes the set of registers it defines (writes) and
-uses (reads). This is useful for dataflow analysis, JIT compilers, and
-decompilers.
+## Effects and control flow
+
+Effects distinguish resources that must be accessed from resources that may be
+accessed under an unknown SH-4 FPSCR mode. They also report memory accesses and
+control flow without allocating.
 
 ```rust
-use superh::{parse, AnyReg, Options, Reg};
+use superh::{
+    DecodeOptions, DecodeResult, EffectContext, Reg, Resource, decode,
+};
 
-let opts = Options::default();
-let ins = parse(0x321c, 0, &opts); // add r1, r2
-
-let defs: Vec<AnyReg> = ins.defs().iter().copied().collect();
-let uses: Vec<AnyReg> = ins.uses().iter().copied().collect();
-
-assert!(defs.contains(&AnyReg::Gp(Reg::R2))); // r2 is written
-assert!(uses.contains(&AnyReg::Gp(Reg::R1))); // r1 is read
-assert!(uses.contains(&AnyReg::Gp(Reg::R2))); // r2 is also read
+let DecodeResult::Instruction(ins) = decode(0x321c, &DecodeOptions::default()) else {
+    panic!("known instruction")
+};
+let effects = ins.effects(EffectContext::default());
+assert!(effects.must_read().contains(Resource::Gp(Reg::R1)));
+assert!(effects.must_write().contains(Resource::Gp(Reg::R2)));
 ```
 
-The `AnyReg` enum covers every register file:
+`ins.at(address).branch_target()` resolves direct branches, while
+`pc_relative_address()` identifies literal-pool references for `mov.w`,
+`mov.l`, and `mova`.
 
-```text
-AnyReg::Gp(Reg)       // r0–r15
-AnyReg::Fr(FReg)      // fr0–fr15  (sh4 feature)
-AnyReg::Dr(DReg)      // dr0/dr2/…/dr14  (sh4 feature)
-AnyReg::Fv(VecReg)    // fv0/fv4/fv8/fv12  (sh4 feature)
-AnyReg::Sys(SysReg)   // Sr, Gbr, Vbr, Ssr, Spc, Sgr, Dbr, Pr, Mach, Macl, Fpul, Fpscr, T
-```
+## Structured formatting
 
-`SysReg::T` is the condition bit. Every instruction that writes T has it in
-`defs()`; every consumer (`bt`, `bf`, `movt`, `addc`, …) has it in `uses()`.
-
-### Branch delay slots
-
-SuperH branches have a delay slot — the instruction immediately after the
-branch always executes before the branch takes effect.
+`FormatIns` separates mnemonic and operand rendering and provides typed hooks
+for registers, immediates, displacements, PC-relative addresses, and branches.
 
 ```rust
-use superh::{parse, Options};
+use core::fmt::Write as _;
+use superh::{DecodeOptions, DecodeResult, FormatIns, FormatOptions, Reg, decode};
 
-let opts = Options::default();
-assert!(parse(0xa000, 0, &opts).is_delayed_branch()); // bra
-assert!(parse(0x402b, 0, &opts).is_delayed_branch()); // jmp @r0
-assert!(!parse(0x8900, 0, &opts).is_delayed_branch()); // bt (no delay slot)
-```
-
-### The FormatIns trait
-
-`FormatIns` lets you customise how an instruction is rendered. Implement it on
-any type that also implements `core::fmt::Write`.
-
-```rust
-use std::fmt::Write as _;
-use superh::{parse, FormatIns, Options, Reg};
-
-pub struct MyFormatter {
-    buf: String,
-    options: Options,
-}
-
-impl std::fmt::Write for MyFormatter {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.buf.push_str(s);
+struct Formatter { text: String, options: FormatOptions }
+impl core::fmt::Write for Formatter {
+    fn write_str(&mut self, value: &str) -> core::fmt::Result {
+        self.text.push_str(value);
         Ok(())
     }
 }
-
-impl FormatIns for MyFormatter {
-    fn options(&self) -> &Options {
-        &self.options
-    }
-
-    // Override register formatting
+impl FormatIns for Formatter {
+    fn options(&self) -> &FormatOptions { &self.options }
     fn write_reg(&mut self, reg: Reg) -> core::fmt::Result {
-        self.write_str("REG:")?;
-        self.write_str(reg.name())
+        write!(self, "REG({})", reg.number())
     }
 }
 
-let mut formatter = MyFormatter { buf: String::new(), options: Options::default() };
-let ins = parse(0x6323, 0, &formatter.options);
-formatter.write_ins(&ins).unwrap();
-println!("{}", formatter.buf); // "mov REG:r2, REG:r3"
+let DecodeResult::Instruction(ins) = decode(0x6323, &DecodeOptions::default()) else {
+    panic!("known instruction")
+};
+let mut formatter = Formatter { text: String::new(), options: FormatOptions::default() };
+formatter.write_ins(&ins, 0).expect("formatting into a string cannot fail");
+assert_eq!(formatter.text, "mov REG(2), REG(3)");
 ```
 
-### Feature flags
+## Architecture selection
 
-SH versions are additive: enabling a higher version implies all lower ones.
+Cargo features are additive and control code size. `DecodeOptions::architecture`
+selects one of the architectures compiled into the build.
 
-| Feature | Enables |
-|---------|---------|
-| `sh1`   | SH1 instructions (always available) |
-| `sh2`   | SH1 + SH2 |
-| `sh3`   | SH1 + SH2 + SH3 |
-| `sh4`   | SH1 + SH2 + SH3 + SH4 (FPU included) |
+| Feature | Compiled instruction sets |
+| --- | --- |
+| `sh1` | SH-1 |
+| `sh2` | SH-1, SH-2 |
+| `sh3` | SH-1, SH-2, SH-3 |
+| `sh4` | SH-1, SH-2, SH-3, SH-4 |
 
-The default feature set enables all four. To build a minimal SH1-only binary:
+The default enables all four. A build with no architecture feature is rejected
+with a targeted compiler diagnostic.
 
-```toml
-[dependencies]
-superh = { version = "*", default-features = false, features = ["sh1"] }
+## Development gates
+
+```bash
+cargo run -p superh-generator
+cargo test --workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo doc --workspace --all-features --no-deps
+cargo run -p superh-fuzz --release -- parse
+cargo run -p superh-fuzz --release -- opcode_ids
+cargo run -p superh-fuzz --release -- effects
 ```
+
+The independent ISA audit is sourced from the Renesas SH-1/SH-2/SH-DSP
+Software Manual (REJ09B0171), SH-3/SH-3E/SH3-DSP Software Manual Rev. 4.00,
+and SH-4 Software Manual (REJ09B0318). SH-4A-only encodings are not accepted as
+SH-4.

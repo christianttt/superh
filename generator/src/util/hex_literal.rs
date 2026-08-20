@@ -14,6 +14,6 @@ impl<T: LowerHex> LowerHex for HexLiteral<T> {
 impl<T: LowerHex> ToTokens for HexLiteral<T> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let s = format!("{:#x}", self);
-        tokens.extend(TokenStream::from_str(&s).unwrap());
+        tokens.extend(TokenStream::from_str(&s).expect("formatted hex literal is valid Rust"));
     }
 }

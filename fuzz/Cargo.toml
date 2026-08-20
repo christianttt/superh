@@ -1,15 +1,17 @@
 [package]
 name = "superh-fuzz"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Fuzzer for superh"
 publish = false
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "superh-fuzz"
 path = "src/main.rs"
 
 [dependencies]
-num_cpus = "1.17.0"
-rand = "0.10.1"
+rand = "0.10.2"
 superh = { path = "../disasm" }

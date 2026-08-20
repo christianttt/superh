@@ -1,86 +1,128 @@
 mod sh;
 
-use std::time::Instant;
+use std::{fmt::Display, process::ExitCode, str::FromStr, thread, time::Instant};
 
-#[derive(Clone, Copy)]
+const MAX_THREADS: usize = 1 << u16::BITS;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Test {
     Parse,
     ParseRandom,
+    Parser,
+    ParserData,
     Display,
-    Reparse,
-    Defs,
-    Uses,
-    /// Dump all 65536 disassembly results to stdout for differential testing.
+    DisplayReuse,
+    RedecodeFull,
+    Redecode,
+    Encode,
+    OpcodeIds,
+    Effects,
+    /// Dump all 65536 disassembly results to stdout for snapshots or external analysis.
     /// Output format: one line per word — `"XXXX: <disasm>\n"`
     Dump,
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let mut threads = num_cpus::get();
-    let mut iterations: usize = 1_000_000;
-    let mut repeat: usize = 1;
-    let mut test = Test::Parse;
-    // PCs to exercise for exhaustive tests; default covers aligned and unaligned cases.
-    let mut pcs: Vec<u32> = Vec::new();
+#[derive(Debug, PartialEq, Eq)]
+struct Config {
+    threads: usize,
+    iterations: usize,
+    repeat: usize,
+    test: Test,
+    pcs: Vec<u32>,
+}
 
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-t" => {
-                i += 1;
-                threads = args[i].parse().expect("-t requires a number");
-            }
-            "-n" => {
-                i += 1;
-                iterations = args[i].parse().expect("-n requires a number");
-            }
-            "-r" => {
-                i += 1;
-                repeat = args[i].parse().expect("-r requires a number");
-            }
-            "--pc" => {
-                i += 1;
-                let s = &args[i];
-                let s = s.strip_prefix("0x").unwrap_or(s);
-                pcs.push(u32::from_str_radix(s, 16).expect("--pc requires a hex address"));
-            }
-            "parse" => test = Test::Parse,
-            "parse_random" => test = Test::ParseRandom,
-            "display" => test = Test::Display,
-            "reparse" => test = Test::Reparse,
-            "defs" => test = Test::Defs,
-            "uses" => test = Test::Uses,
-            "dump" => test = Test::Dump,
-            "-h" | "--help" => {
-                print_usage();
-                return;
-            }
-            arg => {
-                eprintln!("Unknown argument: {arg}");
-                print_usage();
-                std::process::exit(1);
-            }
+fn main() -> ExitCode {
+    let config = match parse_args(std::env::args().skip(1)) {
+        Ok(Some(config)) => config,
+        Ok(None) => {
+            print_usage();
+            return ExitCode::SUCCESS;
         }
-        i += 1;
+        Err(error) => {
+            eprintln!("error: {error}");
+            print_usage();
+            return ExitCode::FAILURE;
+        }
+    };
+    run(config);
+    ExitCode::SUCCESS
+}
+
+fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Config>, String> {
+    let mut config = Config {
+        threads: thread::available_parallelism().map_or(1, |count| count.get()),
+        iterations: 1_000_000,
+        repeat: 1,
+        test: Test::Parse,
+        pcs: Vec::new(),
+    };
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-t" => config.threads = parse_value(&mut args, "-t")?,
+            "-n" => config.iterations = parse_value(&mut args, "-n")?,
+            "-r" => config.repeat = parse_value(&mut args, "-r")?,
+            "--pc" => {
+                let value = args.next().ok_or_else(|| "--pc requires a value".to_owned())?;
+                let value = value.strip_prefix("0x").unwrap_or(&value);
+                let pc = u32::from_str_radix(value, 16)
+                    .map_err(|error| format!("invalid --pc value '{value}': {error}"))?;
+                config.pcs.push(pc);
+            }
+            "parse" => config.test = Test::Parse,
+            "parse_random" => config.test = Test::ParseRandom,
+            "parser" => config.test = Test::Parser,
+            "parser_data" => config.test = Test::ParserData,
+            "display" => config.test = Test::Display,
+            "display_reuse" => config.test = Test::DisplayReuse,
+            "redecode_full" => config.test = Test::RedecodeFull,
+            "redecode" => config.test = Test::Redecode,
+            "encode" => config.test = Test::Encode,
+            "opcode_ids" => config.test = Test::OpcodeIds,
+            "effects" => config.test = Test::Effects,
+            "dump" => config.test = Test::Dump,
+            "-h" | "--help" => return Ok(None),
+            _ => return Err(format!("unknown argument '{arg}'")),
+        }
     }
 
-    // Default PCs: 0 (aligned), 2 (unaligned), and a large aligned/unaligned pair.
-    if pcs.is_empty() {
-        pcs = vec![0x0000_0000, 0x0000_0002, 0x8c01_0000, 0x8c01_0002];
+    if !(1..=MAX_THREADS).contains(&config.threads) {
+        return Err(format!("thread count must be in 1..={MAX_THREADS}"));
     }
+    if config.pcs.is_empty() {
+        config.pcs = vec![0x0000_0000, 0x0000_0002, 0x8c01_0000, 0x8c01_0002];
+    }
+    Ok(Some(config))
+}
+
+fn parse_value<T>(args: &mut impl Iterator<Item = String>, option: &str) -> Result<T, String>
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    let value = args.next().ok_or_else(|| format!("{option} requires a value"))?;
+    value.parse().map_err(|error| format!("invalid {option} value '{value}': {error}"))
+}
+
+fn run(config: Config) {
+    let Config { threads, iterations, repeat, test, pcs } = config;
 
     let overall_start = Instant::now();
-    if let Test::Dump = test {
+    if matches!(test, Test::Dump) {
         sh::dump();
     } else {
         let test_name = match test {
             Test::Parse => "parse",
             Test::ParseRandom => "parse_random",
+            Test::Parser => "parser",
+            Test::ParserData => "parser_data",
             Test::Display => "display",
-            Test::Reparse => "reparse",
-            Test::Defs => "defs",
-            Test::Uses => "uses",
+            Test::DisplayReuse => "display_reuse",
+            Test::RedecodeFull => "redecode_full",
+            Test::Redecode => "redecode",
+            Test::Encode => "encode",
+            Test::OpcodeIds => "opcode_ids",
+            Test::Effects => "effects",
             Test::Dump => unreachable!(),
         };
 
@@ -117,21 +159,62 @@ fn print_usage() {
         "Usage: superh-fuzz [OPTIONS] [TEST]
 
 Options:
-  -t <threads>    Number of threads (default: num_cpus)
+  -t <threads>    Number of threads (default: available parallelism)
   -n <count>      Iterations for random tests (default: 1000000)
   -r <repeat>     Passes over all 65536 words for exhaustive tests (default: 1)
-  --pc <hex>      Base PC address for parse/display/reparse/defs/uses (repeatable;
+  --pc <hex>      Base PC address for parse/display/effects (repeatable;
                   default runs four PCs: 0x0, 0x2, 0x8c010000, 0x8c010002)
 
 Tests:
   parse           Parse all 65536 SH instruction words exhaustively
   parse_random    Parse random instruction words
+  parser          Stream all words through Parser instruction mode
+  parser_data     Stream all words through Parser data mode
   display         Parse and format every instruction word
-  reparse         Verify parse_with_discriminant round-trips every word
-  defs            Call defs() on every parsed instruction
-  uses            Call uses() on every parsed instruction
-  dump            Dump all 65536 disassembly results to stdout (for diff testing)
+  display_reuse   Format into one reusable string buffer
+  redecode_full   Re-decode known-valid words through full dispatch
+  redecode        Re-decode known-valid words using the stored opcode
+  encode          Encode previously decoded instructions
+  opcode_ids      Verify stable opcode IDs round-trip for every decoded word
+  effects         Compute effects for every decoded instruction
+  dump            Dump all 65536 disassembly results to stdout
 
 Default test: parse"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Result<Option<Config>, String> {
+        parse_args(args.iter().map(|value| (*value).to_owned()))
+    }
+
+    #[test]
+    fn parses_valid_options() {
+        let config = parse(&["-t", "3", "-n", "17", "-r", "2", "--pc", "0x1000", "effects"])
+            .expect("valid arguments")
+            .expect("run configuration");
+        assert_eq!(
+            config,
+            Config {
+                threads: 3,
+                iterations: 17,
+                repeat: 2,
+                test: Test::Effects,
+                pcs: vec![0x1000],
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_missing_and_invalid_values() {
+        assert_eq!(parse(&["-t"]).expect_err("missing value"), "-t requires a value");
+        assert_eq!(
+            parse(&["-t", "0"]).expect_err("zero threads"),
+            format!("thread count must be in 1..={MAX_THREADS}")
+        );
+        assert!(parse(&["--pc", "xyz"]).expect_err("invalid PC").starts_with("invalid --pc"));
+    }
 }

@@ -11,8 +11,7 @@
 #
 # Field types: reg | freg | dreg | vecreg | bankreg | uimm | simm | disp | branch_target
 #
-# version: sh1 | sh2 | sh3 | sh4
-#   sh2 implies sh1 available, sh3 implies sh2, sh4 implies sh3.
+# Every opcode has a stable, non-reused id and an explicit architecture list.
 
 opcodes:
 
@@ -21,27 +20,33 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: MovRmRn
+    id: 0
     opcode: "mov"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov"
     pattern: "0110nnnnmmmm0011"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: MovImmRn
+    id: 1
     opcode: "mov"
     args: "#{imm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov"
     pattern: "1110nnnniiiiiiii"
     fields: { n: reg, i: simm }
     defs: [rn]
     uses: []
 
   - name: MovwAtDispPcRn
+    id: 2
     opcode: "mov.w"
     args: "@({disp}, pc), {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "1001nnnndddddddd"
     fields: { n: reg, d: disp }
     scale: 2
@@ -50,9 +55,11 @@ opcodes:
     uses: []
 
   - name: MovlAtDispPcRn
+    id: 3
     opcode: "mov.l"
     args: "@({disp}, pc), {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "1101nnnndddddddd"
     fields: { n: reg, d: disp }
     scale: 4
@@ -62,27 +69,33 @@ opcodes:
 
   # Store to @Rn
   - name: MovbRmAtRn
+    id: 4
     opcode: "mov.b"
     args: "{rm}, @{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "0010nnnnmmmm0000"
     fields: { n: reg, m: reg }
     defs: []
     uses: [rm, rn]
 
   - name: MovwRmAtRn
+    id: 5
     opcode: "mov.w"
     args: "{rm}, @{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "0010nnnnmmmm0001"
     fields: { n: reg, m: reg }
     defs: []
     uses: [rm, rn]
 
   - name: MovlRmAtRn
+    id: 6
     opcode: "mov.l"
     args: "{rm}, @{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0010nnnnmmmm0010"
     fields: { n: reg, m: reg }
     defs: []
@@ -90,27 +103,33 @@ opcodes:
 
   # Load from @Rm
   - name: MovbAtRmRn
+    id: 7
     opcode: "mov.b"
     args: "@{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "0110nnnnmmmm0000"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: MovwAtRmRn
+    id: 8
     opcode: "mov.w"
     args: "@{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "0110nnnnmmmm0001"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: MovlAtRmRn
+    id: 9
     opcode: "mov.l"
     args: "@{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0110nnnnmmmm0010"
     fields: { n: reg, m: reg }
     defs: [rn]
@@ -118,27 +137,33 @@ opcodes:
 
   # Pre-decrement store @-Rn
   - name: MovbRmAtDecRn
+    id: 10
     opcode: "mov.b"
     args: "{rm}, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "0010nnnnmmmm0100"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: MovwRmAtDecRn
+    id: 11
     opcode: "mov.w"
     args: "{rm}, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "0010nnnnmmmm0101"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: MovlRmAtDecRn
+    id: 12
     opcode: "mov.l"
     args: "{rm}, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0010nnnnmmmm0110"
     fields: { n: reg, m: reg }
     defs: [rn]
@@ -146,27 +171,33 @@ opcodes:
 
   # Post-increment load @Rm+
   - name: MovbAtRmIncRn
+    id: 13
     opcode: "mov.b"
     args: "@{rm}+, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "0110nnnnmmmm0100"
     fields: { n: reg, m: reg }
     defs: [rn, rm]
     uses: [rm]
 
   - name: MovwAtRmIncRn
+    id: 14
     opcode: "mov.w"
     args: "@{rm}+, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "0110nnnnmmmm0101"
     fields: { n: reg, m: reg }
     defs: [rn, rm]
     uses: [rm]
 
   - name: MovlAtRmIncRn
+    id: 15
     opcode: "mov.l"
     args: "@{rm}+, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0110nnnnmmmm0110"
     fields: { n: reg, m: reg }
     defs: [rn, rm]
@@ -174,18 +205,22 @@ opcodes:
 
   # Displacement store @(disp,Rn) — n is at [7:4], d at [3:0]
   - name: MovbR0AtDispRn
+    id: 16
     opcode: "mov.b"
     args: "r0, @({disp}, {rn})"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "10000000nnnndddd"
     fields: { n: reg, d: disp }
     defs: []
     uses: [r0, rn]
 
   - name: MovwR0AtDispRn
+    id: 17
     opcode: "mov.w"
     args: "r0, @({disp}, {rn})"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "10000001nnnndddd"
     fields: { n: reg, d: disp }
     scale: 2
@@ -193,9 +228,11 @@ opcodes:
     uses: [r0, rn]
 
   - name: MovlRmAtDispRn
+    id: 18
     opcode: "mov.l"
     args: "{rm}, @({disp}, {rn})"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0001nnnnmmmmdddd"
     fields: { n: reg, m: reg, d: disp }
     scale: 4
@@ -204,18 +241,22 @@ opcodes:
 
   # Displacement load @(disp,Rm) — m at [7:4], d at [3:0]
   - name: MovbAtDispRmR0
+    id: 19
     opcode: "mov.b"
     args: "@({disp}, {rm}), r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "10000100mmmmdddd"
     fields: { m: reg, d: disp }
     defs: [r0]
     uses: [rm]
 
   - name: MovwAtDispRmR0
+    id: 20
     opcode: "mov.w"
     args: "@({disp}, {rm}), r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "10000101mmmmdddd"
     fields: { m: reg, d: disp }
     scale: 2
@@ -223,9 +264,11 @@ opcodes:
     uses: [rm]
 
   - name: MovlAtDispRmRn
+    id: 21
     opcode: "mov.l"
     args: "@({disp}, {rm}), {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0101nnnnmmmmdddd"
     fields: { n: reg, m: reg, d: disp }
     scale: 4
@@ -234,54 +277,66 @@ opcodes:
 
   # Indexed (R0+Rm) store/load
   - name: MovbRmAtR0Rn
+    id: 22
     opcode: "mov.b"
     args: "{rm}, @(r0, {rn})"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "0000nnnnmmmm0100"
     fields: { n: reg, m: reg }
     defs: []
     uses: [r0, rm, rn]
 
   - name: MovwRmAtR0Rn
+    id: 23
     opcode: "mov.w"
     args: "{rm}, @(r0, {rn})"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "0000nnnnmmmm0101"
     fields: { n: reg, m: reg }
     defs: []
     uses: [r0, rm, rn]
 
   - name: MovlRmAtR0Rn
+    id: 24
     opcode: "mov.l"
     args: "{rm}, @(r0, {rn})"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0000nnnnmmmm0110"
     fields: { n: reg, m: reg }
     defs: []
     uses: [r0, rm, rn]
 
   - name: MovbAtR0RmRn
+    id: 25
     opcode: "mov.b"
     args: "@(r0, {rm}), {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "0000nnnnmmmm1100"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [r0, rm]
 
   - name: MovwAtR0RmRn
+    id: 26
     opcode: "mov.w"
     args: "@(r0, {rm}), {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "0000nnnnmmmm1101"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [r0, rm]
 
   - name: MovlAtR0RmRn
+    id: 27
     opcode: "mov.l"
     args: "@(r0, {rm}), {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "0000nnnnmmmm1110"
     fields: { n: reg, m: reg }
     defs: [rn]
@@ -289,18 +344,22 @@ opcodes:
 
   # GBR-relative
   - name: MovbR0AtDispGbr
+    id: 28
     opcode: "mov.b"
     args: "r0, @({disp}, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "11000000dddddddd"
     fields: { d: disp }
     defs: []
     uses: [r0, gbr]
 
   - name: MovwR0AtDispGbr
+    id: 29
     opcode: "mov.w"
     args: "r0, @({disp}, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "11000001dddddddd"
     fields: { d: disp }
     scale: 2
@@ -308,9 +367,11 @@ opcodes:
     uses: [r0, gbr]
 
   - name: MovlR0AtDispGbr
+    id: 30
     opcode: "mov.l"
     args: "r0, @({disp}, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "11000010dddddddd"
     fields: { d: disp }
     scale: 4
@@ -318,18 +379,22 @@ opcodes:
     uses: [r0, gbr]
 
   - name: MovbAtDispGbrR0
+    id: 31
     opcode: "mov.b"
     args: "@({disp}, gbr), r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.b"
     pattern: "11000100dddddddd"
     fields: { d: disp }
     defs: [r0]
     uses: [gbr]
 
   - name: MovwAtDispGbrR0
+    id: 32
     opcode: "mov.w"
     args: "@({disp}, gbr), r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.w"
     pattern: "11000101dddddddd"
     fields: { d: disp }
     scale: 2
@@ -337,9 +402,11 @@ opcodes:
     uses: [gbr]
 
   - name: MovlAtDispGbrR0
+    id: 33
     opcode: "mov.l"
     args: "@({disp}, gbr), r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mov.l"
     pattern: "11000110dddddddd"
     fields: { d: disp }
     scale: 4
@@ -348,9 +415,11 @@ opcodes:
 
   # MOVA — load effective address
   - name: Mova
+    id: 34
     opcode: "mova"
     args: "@({disp}, pc), r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mova"
     pattern: "11000111dddddddd"
     fields: { d: disp }
     scale: 4
@@ -360,9 +429,11 @@ opcodes:
 
   # MOVT — move T bit
   - name: Movt
+    id: 35
     opcode: "movt"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:movt"
     pattern: "0000nnnn00101001"
     fields: { n: reg }
     defs: [rn]
@@ -370,9 +441,11 @@ opcodes:
 
   # MOVCA.L — move with cache bypass (SH4)
   - name: MovcalR0AtRn
+    id: 36
     opcode: "movca.l"
     args: "r0, @{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:movca.l"
     pattern: "0000nnnn11000011"
     fields: { n: reg }
     defs: []
@@ -380,18 +453,22 @@ opcodes:
 
   # SWAP
   - name: SwapbRmRn
+    id: 37
     opcode: "swap.b"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:swap.b"
     pattern: "0110nnnnmmmm1000"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: SwapwRmRn
+    id: 38
     opcode: "swap.w"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:swap.w"
     pattern: "0110nnnnmmmm1001"
     fields: { n: reg, m: reg }
     defs: [rn]
@@ -399,9 +476,11 @@ opcodes:
 
   # XTRCT
   - name: XtrctRmRn
+    id: 39
     opcode: "xtrct"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:xtrct"
     pattern: "0010nnnnmmmm1101"
     fields: { n: reg, m: reg }
     defs: [rn]
@@ -412,297 +491,363 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: AddRmRn
+    id: 40
     opcode: "add"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:add"
     pattern: "0011nnnnmmmm1100"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: AddImmRn
+    id: 41
     opcode: "add"
     args: "#{imm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:add"
     pattern: "0111nnnniiiiiiii"
     fields: { n: reg, i: simm }
     defs: [rn]
     uses: [rn]
 
   - name: AddcRmRn
+    id: 42
     opcode: "addc"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:addc"
     pattern: "0011nnnnmmmm1110"
     fields: { n: reg, m: reg }
     defs: [rn, t]
     uses: [rm, rn, t]
 
   - name: AddvRmRn
+    id: 43
     opcode: "addv"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:addv"
     pattern: "0011nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [rn, t]
     uses: [rm, rn]
 
   - name: CmpeqImmR0
+    id: 44
     opcode: "cmp/eq"
     args: "#{imm}, r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/eq"
     pattern: "10001000iiiiiiii"
     fields: { i: simm }
     defs: [t]
     uses: [r0]
 
   - name: CmpeqRmRn
+    id: 45
     opcode: "cmp/eq"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/eq"
     pattern: "0011nnnnmmmm0000"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: CmpgeRmRn
+    id: 46
     opcode: "cmp/ge"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/ge"
     pattern: "0011nnnnmmmm0011"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: CmpgtRmRn
+    id: 47
     opcode: "cmp/gt"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/gt"
     pattern: "0011nnnnmmmm0111"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: CmphiRmRn
+    id: 48
     opcode: "cmp/hi"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/hi"
     pattern: "0011nnnnmmmm0110"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: CmphsRmRn
+    id: 49
     opcode: "cmp/hs"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/hs"
     pattern: "0011nnnnmmmm0010"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: CmpplRn
+    id: 50
     opcode: "cmp/pl"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/pl"
     pattern: "0100nnnn00010101"
     fields: { n: reg }
     defs: [t]
     uses: [rn]
 
   - name: CmppzRn
+    id: 51
     opcode: "cmp/pz"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/pz"
     pattern: "0100nnnn00010001"
     fields: { n: reg }
     defs: [t]
     uses: [rn]
 
   - name: CmpstrRmRn
+    id: 52
     opcode: "cmp/str"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:cmp/str"
     pattern: "0010nnnnmmmm1100"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: Div0sRmRn
+    id: 53
     opcode: "div0s"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:div0s"
     pattern: "0010nnnnmmmm0111"
     fields: { n: reg, m: reg }
-    defs: [t]
+    defs: [t, q, m]
     uses: [rm, rn]
 
   - name: Div0u
+    id: 54
     opcode: "div0u"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:div0u"
     pattern: "0000000000011001"
     fields: {}
-    defs: [t]
+    defs: [t, q, m]
     uses: []
 
   - name: Div1RmRn
+    id: 55
     opcode: "div1"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:div1"
     pattern: "0011nnnnmmmm0100"
     fields: { n: reg, m: reg }
-    defs: [rn, t]
-    uses: [rm, rn, t]
+    defs: [rn, t, q]
+    uses: [rm, rn, t, q, m]
 
   - name: DmulslRmRn
+    id: 56
     opcode: "dmuls.l"
     args: "{rm}, {rn}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:dmuls.l"
     pattern: "0011nnnnmmmm1101"
     fields: { n: reg, m: reg }
     defs: [mach, macl]
     uses: [rm, rn]
 
   - name: DmuluRmRn
+    id: 57
     opcode: "dmulu.l"
     args: "{rm}, {rn}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:dmulu.l"
     pattern: "0011nnnnmmmm0101"
     fields: { n: reg, m: reg }
     defs: [mach, macl]
     uses: [rm, rn]
 
   - name: DtRn
+    id: 58
     opcode: "dt"
     args: "{rn}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:dt"
     pattern: "0100nnnn00010000"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: ExtsbRmRn
+    id: 59
     opcode: "exts.b"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:exts.b"
     pattern: "0110nnnnmmmm1110"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: ExtswRmRn
+    id: 60
     opcode: "exts.w"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:exts.w"
     pattern: "0110nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: ExtubRmRn
+    id: 61
     opcode: "extu.b"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:extu.b"
     pattern: "0110nnnnmmmm1100"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: ExtuwRmRn
+    id: 62
     opcode: "extu.w"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:extu.w"
     pattern: "0110nnnnmmmm1101"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: MaclAtRmIncAtRnInc
+    id: 63
     opcode: "mac.l"
     args: "@{rm}+, @{rn}+"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mac.l"
     pattern: "0000nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [rn, rm, mach, macl]
     uses: [rn, rm, mach, macl]
 
   - name: MacwAtRmIncAtRnInc
+    id: 64
     opcode: "mac.w"
     args: "@{rm}+, @{rn}+"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mac.w"
     pattern: "0100nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [rn, rm, mach, macl]
     uses: [rn, rm, mach, macl]
 
   - name: MullRmRn
+    id: 65
     opcode: "mul.l"
     args: "{rm}, {rn}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mul.l"
     pattern: "0000nnnnmmmm0111"
     fields: { n: reg, m: reg }
     defs: [macl]
     uses: [rm, rn]
 
   - name: MulswRmRn
+    id: 66
     opcode: "muls.w"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:muls.w"
     pattern: "0010nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [macl]
     uses: [rm, rn]
 
   - name: MuluwRmRn
+    id: 67
     opcode: "mulu.w"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:mulu.w"
     pattern: "0010nnnnmmmm1110"
     fields: { n: reg, m: reg }
     defs: [macl]
     uses: [rm, rn]
 
   - name: NegRmRn
+    id: 68
     opcode: "neg"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:neg"
     pattern: "0110nnnnmmmm1011"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: NegcRmRn
+    id: 69
     opcode: "negc"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:negc"
     pattern: "0110nnnnmmmm1010"
     fields: { n: reg, m: reg }
     defs: [rn, t]
     uses: [rm, t]
 
   - name: SubRmRn
+    id: 70
     opcode: "sub"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sub"
     pattern: "0011nnnnmmmm1000"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: SubcRmRn
+    id: 71
     opcode: "subc"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:subc"
     pattern: "0011nnnnmmmm1010"
     fields: { n: reg, m: reg }
     defs: [rn, t]
     uses: [rm, rn, t]
 
   - name: SubvRmRn
+    id: 72
     opcode: "subv"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:subv"
     pattern: "0011nnnnmmmm1011"
     fields: { n: reg, m: reg }
     defs: [rn, t]
@@ -713,126 +858,154 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: AndRmRn
+    id: 73
     opcode: "and"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:and"
     pattern: "0010nnnnmmmm1001"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: AndImmR0
+    id: 74
     opcode: "and"
     args: "#{imm}, r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:and"
     pattern: "11001001iiiiiiii"
     fields: { i: uimm }
     defs: [r0]
     uses: [r0]
 
   - name: AndbImmAtR0Gbr
+    id: 75
     opcode: "and.b"
     args: "#{imm}, @(r0, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:and.b"
     pattern: "11001101iiiiiiii"
     fields: { i: uimm }
     defs: []
     uses: [r0, gbr]
 
   - name: NotRmRn
+    id: 76
     opcode: "not"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:not"
     pattern: "0110nnnnmmmm0111"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm]
 
   - name: OrRmRn
+    id: 77
     opcode: "or"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:or"
     pattern: "0010nnnnmmmm1011"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: OrImmR0
+    id: 78
     opcode: "or"
     args: "#{imm}, r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:or"
     pattern: "11001011iiiiiiii"
     fields: { i: uimm }
     defs: [r0]
     uses: [r0]
 
   - name: OrbImmAtR0Gbr
+    id: 79
     opcode: "or.b"
     args: "#{imm}, @(r0, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:or.b"
     pattern: "11001111iiiiiiii"
     fields: { i: uimm }
     defs: []
     uses: [r0, gbr]
 
   - name: TasbAtRn
+    id: 80
     opcode: "tas.b"
     args: "@{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:tas.b"
     pattern: "0100nnnn00011011"
     fields: { n: reg }
     defs: [t]
     uses: [rn]
 
   - name: TstRmRn
+    id: 81
     opcode: "tst"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:tst"
     pattern: "0010nnnnmmmm1000"
     fields: { n: reg, m: reg }
     defs: [t]
     uses: [rm, rn]
 
   - name: TstImmR0
+    id: 82
     opcode: "tst"
     args: "#{imm}, r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:tst"
     pattern: "11001000iiiiiiii"
     fields: { i: uimm }
     defs: [t]
     uses: [r0]
 
   - name: TstbImmAtR0Gbr
+    id: 83
     opcode: "tst.b"
     args: "#{imm}, @(r0, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:tst.b"
     pattern: "11001100iiiiiiii"
     fields: { i: uimm }
     defs: [t]
     uses: [r0, gbr]
 
   - name: XorRmRn
+    id: 84
     opcode: "xor"
     args: "{rm}, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:xor"
     pattern: "0010nnnnmmmm1010"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: XorImmR0
+    id: 85
     opcode: "xor"
     args: "#{imm}, r0"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:xor"
     pattern: "11001010iiiiiiii"
     fields: { i: uimm }
     defs: [r0]
     uses: [r0]
 
   - name: XorbImmAtR0Gbr
+    id: 86
     opcode: "xor.b"
     args: "#{imm}, @(r0, gbr)"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:xor.b"
     pattern: "11001110iiiiiiii"
     fields: { i: uimm }
     defs: []
@@ -843,144 +1016,176 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: RotlRn
+    id: 87
     opcode: "rotl"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:rotl"
     pattern: "0100nnnn00000100"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: RotrRn
+    id: 88
     opcode: "rotr"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:rotr"
     pattern: "0100nnnn00000101"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: RotclRn
+    id: 89
     opcode: "rotcl"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:rotcl"
     pattern: "0100nnnn00100100"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn, t]
 
   - name: RotcrRn
+    id: 90
     opcode: "rotcr"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:rotcr"
     pattern: "0100nnnn00100101"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn, t]
 
   - name: ShadRmRn
+    id: 91
     opcode: "shad"
     args: "{rm}, {rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:shad"
     pattern: "0100nnnnmmmm1100"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: ShalRn
+    id: 92
     opcode: "shal"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shal"
     pattern: "0100nnnn00100000"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: SharRn
+    id: 93
     opcode: "shar"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shar"
     pattern: "0100nnnn00100001"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: ShldRmRn
+    id: 94
     opcode: "shld"
     args: "{rm}, {rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:shld"
     pattern: "0100nnnnmmmm1101"
     fields: { n: reg, m: reg }
     defs: [rn]
     uses: [rm, rn]
 
   - name: ShllRn
+    id: 95
     opcode: "shll"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shll"
     pattern: "0100nnnn00000000"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: Shll2Rn
+    id: 96
     opcode: "shll2"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shll2"
     pattern: "0100nnnn00001000"
     fields: { n: reg }
     defs: [rn]
     uses: [rn]
 
   - name: Shll8Rn
+    id: 97
     opcode: "shll8"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shll8"
     pattern: "0100nnnn00011000"
     fields: { n: reg }
     defs: [rn]
     uses: [rn]
 
   - name: Shll16Rn
+    id: 98
     opcode: "shll16"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shll16"
     pattern: "0100nnnn00101000"
     fields: { n: reg }
     defs: [rn]
     uses: [rn]
 
   - name: ShlrRn
+    id: 99
     opcode: "shlr"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shlr"
     pattern: "0100nnnn00000001"
     fields: { n: reg }
     defs: [rn, t]
     uses: [rn]
 
   - name: Shlr2Rn
+    id: 100
     opcode: "shlr2"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shlr2"
     pattern: "0100nnnn00001001"
     fields: { n: reg }
     defs: [rn]
     uses: [rn]
 
   - name: Shlr8Rn
+    id: 101
     opcode: "shlr8"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shlr8"
     pattern: "0100nnnn00011001"
     fields: { n: reg }
     defs: [rn]
     uses: [rn]
 
   - name: Shlr16Rn
+    id: 102
     opcode: "shlr16"
     args: "{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:shlr16"
     pattern: "0100nnnn00101001"
     fields: { n: reg }
     defs: [rn]
@@ -991,9 +1196,11 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: Bt
+    id: 103
     opcode: "bt"
     args: "{disp}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bt"
     pattern: "10001001dddddddd"
     fields: { d: branch_target }
     scale: 2
@@ -1002,9 +1209,11 @@ opcodes:
     uses: [t]
 
   - name: Bts
-    opcode: "bt.s"
+    id: 104
+    opcode: "bt/s"
     args: "{disp}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bt/s"
     pattern: "10001101dddddddd"
     fields: { d: branch_target }
     scale: 2
@@ -1013,9 +1222,11 @@ opcodes:
     uses: [t]
 
   - name: Bf
+    id: 105
     opcode: "bf"
     args: "{disp}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bf"
     pattern: "10001011dddddddd"
     fields: { d: branch_target }
     scale: 2
@@ -1024,9 +1235,11 @@ opcodes:
     uses: [t]
 
   - name: Bfs
-    opcode: "bf.s"
+    id: 106
+    opcode: "bf/s"
     args: "{disp}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bf/s"
     pattern: "10001111dddddddd"
     fields: { d: branch_target }
     scale: 2
@@ -1035,9 +1248,11 @@ opcodes:
     uses: [t]
 
   - name: Bra
+    id: 107
     opcode: "bra"
     args: "{disp}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bra"
     pattern: "1010dddddddddddd"
     fields: { d: branch_target }
     scale: 2
@@ -1046,9 +1261,11 @@ opcodes:
     uses: []
 
   - name: Bsr
+    id: 108
     opcode: "bsr"
     args: "{disp}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bsr"
     pattern: "1011dddddddddddd"
     fields: { d: branch_target }
     scale: 2
@@ -1057,45 +1274,55 @@ opcodes:
     uses: []
 
   - name: BrafRn
+    id: 109
     opcode: "braf"
     args: "{rn}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:braf"
     pattern: "0000nnnn00100011"
     fields: { n: reg }
     defs: []
     uses: [rn]
 
   - name: BsrfRn
+    id: 110
     opcode: "bsrf"
     args: "{rn}"
-    version: sh2
+    architectures: [sh2, sh3, sh4]
+    source: "rej09b0171:section-6:bsrf"
     pattern: "0000nnnn00000011"
     fields: { n: reg }
     defs: [pr]
     uses: [rn]
 
   - name: JmpAtRn
+    id: 111
     opcode: "jmp"
     args: "@{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:jmp"
     pattern: "0100nnnn00101011"
     fields: { n: reg }
     defs: []
     uses: [rn]
 
   - name: JsrAtRn
+    id: 112
     opcode: "jsr"
     args: "@{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:jsr"
     pattern: "0100nnnn00001011"
     fields: { n: reg }
     defs: [pr]
     uses: [rn]
 
   - name: Rts
+    id: 113
     opcode: "rts"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:rts"
     pattern: "0000000000001011"
     fields: {}
     defs: []
@@ -1105,9 +1332,11 @@ opcodes:
   # stack on SH1/SH2. The whole-SR write must be modeled so dataflow analysis
   # does not treat T as live across an rte.
   - name: Rte
+    id: 114
     opcode: "rte"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:rte"
     pattern: "0000000000101011"
     fields: {}
     defs: [sr, t]
@@ -1118,81 +1347,99 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: Clrmac
+    id: 115
     opcode: "clrmac"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:clrmac"
     pattern: "0000000000101000"
     fields: {}
     defs: [mach, macl]
     uses: []
 
   - name: Clrs
+    id: 116
     opcode: "clrs"
     args: ""
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:clrs"
     pattern: "0000000001001000"
     fields: {}
-    defs: [sr]
-    uses: [sr]
+    defs: [s]
+    uses: []
 
   - name: Clrt
+    id: 117
     opcode: "clrt"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:clrt"
     pattern: "0000000000001000"
     fields: {}
     defs: [t]
     uses: []
 
   - name: Sets
+    id: 118
     opcode: "sets"
     args: ""
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:sets"
     pattern: "0000000001011000"
     fields: {}
-    defs: [sr]
-    uses: [sr]
+    defs: [s]
+    uses: []
 
   - name: Sett
+    id: 119
     opcode: "sett"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sett"
     pattern: "0000000000011000"
     fields: {}
     defs: [t]
     uses: []
 
   - name: Nop
+    id: 120
     opcode: "nop"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:nop"
     pattern: "0000000000001001"
     fields: {}
     defs: []
     uses: []
 
   - name: Sleep
+    id: 121
     opcode: "sleep"
     args: ""
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sleep"
     pattern: "0000000000011011"
     fields: {}
     defs: []
     uses: []
 
   - name: Ldtlb
+    id: 122
     opcode: "ldtlb"
     args: ""
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldtlb"
     pattern: "0000000000111000"
     fields: {}
     defs: []
     uses: []
 
   - name: Trapa
+    id: 123
     opcode: "trapa"
     args: "#{imm}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:trapa"
     pattern: "11000011iiiiiiii"
     fields: { i: uimm }
     defs: []
@@ -1202,451 +1449,396 @@ opcodes:
   # Instructions that read or write SR as a whole also read/write the T bit
   # (T is bit 0 of SR), so they list both sr and t.
   - name: StcSrRn
+    id: 124
     opcode: "stc"
     args: "sr, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:stc"
     pattern: "0000nnnn00000010"
     fields: { n: reg }
     defs: [rn]
     uses: [sr, t]
 
   - name: StcGbrRn
+    id: 125
     opcode: "stc"
     args: "gbr, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:stc"
     pattern: "0000nnnn00010010"
     fields: { n: reg }
     defs: [rn]
     uses: [gbr]
 
   - name: StcVbrRn
+    id: 126
     opcode: "stc"
     args: "vbr, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:stc"
     pattern: "0000nnnn00100010"
     fields: { n: reg }
     defs: [rn]
     uses: [vbr]
 
   - name: StcSsrRn
+    id: 127
     opcode: "stc"
     args: "ssr, {rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:stc"
     pattern: "0000nnnn00110010"
     fields: { n: reg }
     defs: [rn]
     uses: [ssr]
 
   - name: StcSpcRn
+    id: 128
     opcode: "stc"
     args: "spc, {rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:stc"
     pattern: "0000nnnn01000010"
     fields: { n: reg }
     defs: [rn]
     uses: [spc]
 
   - name: StcDbrRn
+    id: 129
     opcode: "stc"
     args: "dbr, {rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:stc"
     pattern: "0000nnnn11111010"
     fields: { n: reg }
     defs: [rn]
     uses: [dbr]
 
   - name: StcSgrRn
+    id: 130
     opcode: "stc"
     args: "sgr, {rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:stc"
     pattern: "0000nnnn00111010"
     fields: { n: reg }
     defs: [rn]
     uses: [sgr]
 
   - name: StcBankRn
+    id: 131
     opcode: "stc"
     args: "r{bank}_bank, {rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:stc"
     pattern: "0000nnnn1bbb0010"
     fields: { n: reg, b: bankreg }
     defs: [rn]
-    uses: []
-
-  # The r5_bank/r6_bank/r7_bank encodings below use the 0bbb half of the bank
-  # field, which the Renesas manuals list as reserved (the architectural bank
-  # encoding is 1bbb, handled by the *Bank* entries above). They are decoded
-  # here deliberately for parity with the sh4dis reference disassembler.
-  - name: StcLoBank5Rn
-    opcode: "stc"
-    args: "r5_bank, {rn}"
-    version: sh3
-    pattern: "0000nnnn01010010"
-    fields: { n: reg }
-    defs: [rn]
-    uses: []
-
-  - name: StcLoBank6Rn
-    opcode: "stc"
-    args: "r6_bank, {rn}"
-    version: sh3
-    pattern: "0000nnnn01100010"
-    fields: { n: reg }
-    defs: [rn]
-    uses: []
-
-  - name: StcLoBank7Rn
-    opcode: "stc"
-    args: "r7_bank, {rn}"
-    version: sh3
-    pattern: "0000nnnn01110010"
-    fields: { n: reg }
-    defs: [rn]
-    uses: []
+    uses: [bank]
 
   # STC.L — store control register to @-Rn
   - name: StclSrAtDecRn
+    id: 135
     opcode: "stc.l"
     args: "sr, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:stc.l"
     pattern: "0100nnnn00000011"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, sr, t]
 
   - name: StclGbrAtDecRn
+    id: 136
     opcode: "stc.l"
     args: "gbr, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:stc.l"
     pattern: "0100nnnn00010011"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, gbr]
 
   - name: StclVbrAtDecRn
+    id: 137
     opcode: "stc.l"
     args: "vbr, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:stc.l"
     pattern: "0100nnnn00100011"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, vbr]
 
   - name: StclSsrAtDecRn
+    id: 138
     opcode: "stc.l"
     args: "ssr, @-{rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:stc.l"
     pattern: "0100nnnn00110011"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, ssr]
 
   - name: StclSpcAtDecRn
+    id: 139
     opcode: "stc.l"
     args: "spc, @-{rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:stc.l"
     pattern: "0100nnnn01000011"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, spc]
 
   - name: StclDbrAtDecRn
+    id: 140
     opcode: "stc.l"
     args: "dbr, @-{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:stc.l"
     pattern: "0100nnnn11110010"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, dbr]
 
   - name: StclSgrAtDecRn
+    id: 141
     opcode: "stc.l"
     args: "sgr, @-{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:stc.l"
     pattern: "0100nnnn00110010"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, sgr]
 
   - name: StclBankAtDecRn
+    id: 142
     opcode: "stc.l"
     args: "r{bank}_bank, @-{rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:stc.l"
     pattern: "0100nnnn1bbb0011"
     fields: { n: reg, b: bankreg }
     defs: [rn]
-    uses: [rn]
+    uses: [rn, bank]
 
-  - name: StclLoBank5AtDecRn
-    opcode: "stc.l"
-    args: "r5_bank, @-{rn}"
-    version: sh3
-    pattern: "0100nnnn01010011"
-    fields: { n: reg }
-    defs: [rn]
-    uses: [rn]
 
-  - name: StclLoBank6AtDecRn
-    opcode: "stc.l"
-    args: "r6_bank, @-{rn}"
-    version: sh3
-    pattern: "0100nnnn01100011"
-    fields: { n: reg }
-    defs: [rn]
-    uses: [rn]
 
-  - name: StclLoBank7AtDecRn
-    opcode: "stc.l"
-    args: "r7_bank, @-{rn}"
-    version: sh3
-    pattern: "0100nnnn01110011"
-    fields: { n: reg }
-    defs: [rn]
-    uses: [rn]
 
   # LDC — load control register from Rm
   - name: LdcRmSr
+    id: 146
     opcode: "ldc"
     args: "{rm}, sr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:ldc"
     pattern: "0100mmmm00001110"
     fields: { m: reg }
     defs: [sr, t]
     uses: [rm]
 
   - name: LdcRmGbr
+    id: 147
     opcode: "ldc"
     args: "{rm}, gbr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:ldc"
     pattern: "0100mmmm00011110"
     fields: { m: reg }
     defs: [gbr]
     uses: [rm]
 
   - name: LdcRmVbr
+    id: 148
     opcode: "ldc"
     args: "{rm}, vbr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:ldc"
     pattern: "0100mmmm00101110"
     fields: { m: reg }
     defs: [vbr]
     uses: [rm]
 
   - name: LdcRmSsr
+    id: 149
     opcode: "ldc"
     args: "{rm}, ssr"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldc"
     pattern: "0100mmmm00111110"
     fields: { m: reg }
     defs: [ssr]
     uses: [rm]
 
   - name: LdcRmSpc
+    id: 150
     opcode: "ldc"
     args: "{rm}, spc"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldc"
     pattern: "0100mmmm01001110"
     fields: { m: reg }
     defs: [spc]
     uses: [rm]
 
   - name: LdcRmDbr
+    id: 151
     opcode: "ldc"
     args: "{rm}, dbr"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ldc"
     pattern: "0100mmmm11111010"
     fields: { m: reg }
     defs: [dbr]
     uses: [rm]
 
-  # ldc Rm,sgr / ldc.l @Rm+,sgr are SH4A additions (SGR is read-only on SH4);
-  # they are decoded under sh4 for parity with the sh4dis reference disassembler.
-  - name: LdcRmSgr
-    opcode: "ldc"
-    args: "{rm}, sgr"
-    version: sh4
-    pattern: "0100mmmm00111010"
-    fields: { m: reg }
-    defs: [sgr]
-    uses: [rm]
-
   - name: LdcRmBank
+    id: 153
     opcode: "ldc"
     args: "{rm}, r{bank}_bank"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldc"
     pattern: "0100mmmm1bbb1110"
     fields: { m: reg, b: bankreg }
-    defs: []
-    uses: [rm]
-
-  - name: LdcRmLoBank5
-    opcode: "ldc"
-    args: "{rm}, r5_bank"
-    version: sh3
-    pattern: "0100mmmm01011110"
-    fields: { m: reg }
-    defs: []
-    uses: [rm]
-
-  - name: LdcRmLoBank6
-    opcode: "ldc"
-    args: "{rm}, r6_bank"
-    version: sh3
-    pattern: "0100mmmm01101110"
-    fields: { m: reg }
-    defs: []
-    uses: [rm]
-
-  - name: LdcRmLoBank7
-    opcode: "ldc"
-    args: "{rm}, r7_bank"
-    version: sh3
-    pattern: "0100mmmm01111110"
-    fields: { m: reg }
-    defs: []
+    defs: [bank]
     uses: [rm]
 
   # LDC.L — load control register from @Rm+
   - name: LdclAtRmIncSr
+    id: 157
     opcode: "ldc.l"
     args: "@{rm}+, sr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:ldc.l"
     pattern: "0100mmmm00000111"
     fields: { m: reg }
     defs: [rm, sr, t]
     uses: [rm]
 
   - name: LdclAtRmIncGbr
+    id: 158
     opcode: "ldc.l"
     args: "@{rm}+, gbr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:ldc.l"
     pattern: "0100mmmm00010111"
     fields: { m: reg }
     defs: [rm, gbr]
     uses: [rm]
 
   - name: LdclAtRmIncVbr
+    id: 159
     opcode: "ldc.l"
     args: "@{rm}+, vbr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:ldc.l"
     pattern: "0100mmmm00100111"
     fields: { m: reg }
     defs: [rm, vbr]
     uses: [rm]
 
   - name: LdclAtRmIncSsr
+    id: 160
     opcode: "ldc.l"
     args: "@{rm}+, ssr"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldc.l"
     pattern: "0100mmmm00110111"
     fields: { m: reg }
     defs: [rm, ssr]
     uses: [rm]
 
   - name: LdclAtRmIncSpc
+    id: 161
     opcode: "ldc.l"
     args: "@{rm}+, spc"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldc.l"
     pattern: "0100mmmm01000111"
     fields: { m: reg }
     defs: [rm, spc]
     uses: [rm]
 
   - name: LdclAtRmIncDbr
+    id: 162
     opcode: "ldc.l"
     args: "@{rm}+, dbr"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ldc.l"
     pattern: "0100mmmm11110110"
     fields: { m: reg }
     defs: [rm, dbr]
     uses: [rm]
 
-  - name: LdclAtRmIncSgr
-    opcode: "ldc.l"
-    args: "@{rm}+, sgr"
-    version: sh4
-    pattern: "0100mmmm00110110"
-    fields: { m: reg }
-    defs: [rm, sgr]
-    uses: [rm]
 
   - name: LdclAtRmIncBank
+    id: 164
     opcode: "ldc.l"
     args: "@{rm}+, r{bank}_bank"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:ldc.l"
     pattern: "0100mmmm1bbb0111"
     fields: { m: reg, b: bankreg }
-    defs: [rm]
+    defs: [rm, bank]
     uses: [rm]
 
-  - name: LdclAtRmIncLoBank5
-    opcode: "ldc.l"
-    args: "@{rm}+, r5_bank"
-    version: sh3
-    pattern: "0100mmmm01010111"
-    fields: { m: reg }
-    defs: [rm]
-    uses: [rm]
 
-  - name: LdclAtRmIncLoBank6
-    opcode: "ldc.l"
-    args: "@{rm}+, r6_bank"
-    version: sh3
-    pattern: "0100mmmm01100111"
-    fields: { m: reg }
-    defs: [rm]
-    uses: [rm]
 
-  - name: LdclAtRmIncLoBank7
-    opcode: "ldc.l"
-    args: "@{rm}+, r7_bank"
-    version: sh3
-    pattern: "0100mmmm01110111"
-    fields: { m: reg }
-    defs: [rm]
-    uses: [rm]
 
   # STS — store system register to Rn
   - name: StsMachRn
+    id: 168
     opcode: "sts"
     args: "mach, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sts"
     pattern: "0000nnnn00001010"
     fields: { n: reg }
     defs: [rn]
     uses: [mach]
 
   - name: StsMaclRn
+    id: 169
     opcode: "sts"
     args: "macl, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sts"
     pattern: "0000nnnn00011010"
     fields: { n: reg }
     defs: [rn]
     uses: [macl]
 
   - name: StsPrRn
+    id: 170
     opcode: "sts"
     args: "pr, {rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sts"
     pattern: "0000nnnn00101010"
     fields: { n: reg }
     defs: [rn]
     uses: [pr]
 
   - name: StsFpscrRn
+    id: 171
     opcode: "sts"
     args: "fpscr, {rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:sts"
     pattern: "0000nnnn01101010"
     fields: { n: reg }
     defs: [rn]
     uses: [fpscr]
 
   - name: StsFpulRn
+    id: 172
     opcode: "sts"
     args: "fpul, {rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:sts"
     pattern: "0000nnnn01011010"
     fields: { n: reg }
     defs: [rn]
@@ -1654,45 +1846,55 @@ opcodes:
 
   # STS.L — store system register to @-Rn
   - name: StslMachAtDecRn
+    id: 173
     opcode: "sts.l"
     args: "mach, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sts.l"
     pattern: "0100nnnn00000010"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, mach]
 
   - name: StslMaclAtDecRn
+    id: 174
     opcode: "sts.l"
     args: "macl, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sts.l"
     pattern: "0100nnnn00010010"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, macl]
 
   - name: StslPrAtDecRn
+    id: 175
     opcode: "sts.l"
     args: "pr, @-{rn}"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:sts.l"
     pattern: "0100nnnn00100010"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, pr]
 
   - name: StslFpscrAtDecRn
+    id: 176
     opcode: "sts.l"
     args: "fpscr, @-{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:sts.l"
     pattern: "0100nnnn01100010"
     fields: { n: reg }
     defs: [rn]
     uses: [rn, fpscr]
 
   - name: StslFpulAtDecRn
+    id: 177
     opcode: "sts.l"
     args: "fpul, @-{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:sts.l"
     pattern: "0100nnnn01010010"
     fields: { n: reg }
     defs: [rn]
@@ -1700,45 +1902,55 @@ opcodes:
 
   # LDS — load system register from Rm
   - name: LdsRmMach
+    id: 178
     opcode: "lds"
     args: "{rm}, mach"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:lds"
     pattern: "0100mmmm00001010"
     fields: { m: reg }
     defs: [mach]
     uses: [rm]
 
   - name: LdsRmMacl
+    id: 179
     opcode: "lds"
     args: "{rm}, macl"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:lds"
     pattern: "0100mmmm00011010"
     fields: { m: reg }
     defs: [macl]
     uses: [rm]
 
   - name: LdsRmPr
+    id: 180
     opcode: "lds"
     args: "{rm}, pr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:lds"
     pattern: "0100mmmm00101010"
     fields: { m: reg }
     defs: [pr]
     uses: [rm]
 
   - name: LdsRmFpscr
+    id: 181
     opcode: "lds"
     args: "{rm}, fpscr"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:lds"
     pattern: "0100mmmm01101010"
     fields: { m: reg }
     defs: [fpscr]
     uses: [rm]
 
   - name: LdsRmFpul
+    id: 182
     opcode: "lds"
     args: "{rm}, fpul"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:lds"
     pattern: "0100mmmm01011010"
     fields: { m: reg }
     defs: [fpul]
@@ -1746,45 +1958,55 @@ opcodes:
 
   # LDS.L — load system register from @Rm+
   - name: LdslAtRmIncMach
+    id: 183
     opcode: "lds.l"
     args: "@{rm}+, mach"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:lds.l"
     pattern: "0100mmmm00000110"
     fields: { m: reg }
     defs: [rm, mach]
     uses: [rm]
 
   - name: LdslAtRmIncMacl
+    id: 184
     opcode: "lds.l"
     args: "@{rm}+, macl"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:lds.l"
     pattern: "0100mmmm00010110"
     fields: { m: reg }
     defs: [rm, macl]
     uses: [rm]
 
   - name: LdslAtRmIncPr
+    id: 185
     opcode: "lds.l"
     args: "@{rm}+, pr"
-    version: sh1
+    architectures: [sh1, sh2, sh3, sh4]
+    source: "rej09b0171:section-6:lds.l"
     pattern: "0100mmmm00100110"
     fields: { m: reg }
     defs: [rm, pr]
     uses: [rm]
 
   - name: LdslAtRmIncFpscr
+    id: 186
     opcode: "lds.l"
     args: "@{rm}+, fpscr"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:lds.l"
     pattern: "0100mmmm01100110"
     fields: { m: reg }
     defs: [rm, fpscr]
     uses: [rm]
 
   - name: LdslAtRmIncFpul
+    id: 187
     opcode: "lds.l"
     args: "@{rm}+, fpul"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:lds.l"
     pattern: "0100mmmm01010110"
     fields: { m: reg }
     defs: [rm, fpul]
@@ -1792,36 +2014,44 @@ opcodes:
 
   # Cache / prefetch (SH3/SH4)
   - name: PrefAtRn
+    id: 188
     opcode: "pref"
     args: "@{rn}"
-    version: sh3
+    architectures: [sh3, sh4]
+    source: "sh3-rev4:section-8:pref"
     pattern: "0000nnnn10000011"
     fields: { n: reg }
     defs: []
     uses: [rn]
 
   - name: OcbiAtRn
+    id: 189
     opcode: "ocbi"
     args: "@{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ocbi"
     pattern: "0000nnnn10010011"
     fields: { n: reg }
     defs: []
     uses: [rn]
 
   - name: OcbpAtRn
+    id: 190
     opcode: "ocbp"
     args: "@{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ocbp"
     pattern: "0000nnnn10100011"
     fields: { n: reg }
     defs: []
     uses: [rn]
 
   - name: OcbwbAtRn
+    id: 191
     opcode: "ocbwb"
     args: "@{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ocbwb"
     pattern: "0000nnnn10110011"
     fields: { n: reg }
     defs: []
@@ -1832,118 +2062,145 @@ opcodes:
   # ---------------------------------------------------------------------------
 
   - name: FaddFrmFrn
+    id: 192
     opcode: "fadd"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fadd"
     pattern: "1111nnnnmmmm0000"
     fields: { n: freg, m: freg }
     defs: [frn]
     uses: [frm, frn, fpscr]
 
   - name: FsubFrmFrn
+    id: 193
     opcode: "fsub"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fsub"
     pattern: "1111nnnnmmmm0001"
     fields: { n: freg, m: freg }
     defs: [frn]
     uses: [frm, frn, fpscr]
 
   - name: FmulFrmFrn
+    id: 194
     opcode: "fmul"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmul"
     pattern: "1111nnnnmmmm0010"
     fields: { n: freg, m: freg }
     defs: [frn]
     uses: [frm, frn, fpscr]
 
   - name: FdivFrmFrn
+    id: 195
     opcode: "fdiv"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fdiv"
     pattern: "1111nnnnmmmm0011"
     fields: { n: freg, m: freg }
     defs: [frn]
     uses: [frm, frn, fpscr]
 
   - name: FcmpeqFrmFrn
+    id: 196
     opcode: "fcmp/eq"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fcmp/eq"
     pattern: "1111nnnnmmmm0100"
     fields: { n: freg, m: freg }
     defs: [t]
     uses: [frm, frn, fpscr]
 
   - name: FcmpgtFrmFrn
+    id: 197
     opcode: "fcmp/gt"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fcmp/gt"
     pattern: "1111nnnnmmmm0101"
     fields: { n: freg, m: freg }
     defs: [t]
     uses: [frm, frn, fpscr]
 
-  # FMOV — single-precision variants
+  # FMOV — transfer encodings. Static rendering uses the SZ=0 mnemonic;
+  # effects resolve DR/XD register banks and access width from FPSCR.SZ.
   - name: FmovAtR0RmFrn
-    opcode: "fmov"
+    id: 198
+    opcode: "fmov.s"
     args: "@(r0, {rm}), {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm0110"
     fields: { n: freg, m: reg }
     defs: [frn]
     uses: [r0, rm, fpscr]
 
   - name: FmovFrmAtR0Rn
-    opcode: "fmov"
+    id: 199
+    opcode: "fmov.s"
     args: "{frm}, @(r0, {rn})"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm0111"
     fields: { n: reg, m: freg }
     defs: []
     uses: [r0, frm, rn, fpscr]
 
   - name: FmovAtRmFrn
-    opcode: "fmov"
+    id: 200
+    opcode: "fmov.s"
     args: "@{rm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm1000"
     fields: { n: freg, m: reg }
     defs: [frn]
     uses: [rm, fpscr]
 
   - name: FmovAtRmIncFrn
-    opcode: "fmov"
+    id: 201
+    opcode: "fmov.s"
     args: "@{rm}+, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm1001"
     fields: { n: freg, m: reg }
     defs: [frn, rm]
     uses: [rm, fpscr]
 
   - name: FmovFrmAtRn
-    opcode: "fmov"
+    id: 202
+    opcode: "fmov.s"
     args: "{frm}, @{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm1010"
     fields: { n: reg, m: freg }
     defs: []
     uses: [frm, rn, fpscr]
 
   - name: FmovFrmAtDecRn
-    opcode: "fmov"
+    id: 203
+    opcode: "fmov.s"
     args: "{frm}, @-{rn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm1011"
     fields: { n: reg, m: freg }
     defs: [rn]
     uses: [frm, rn, fpscr]
 
   - name: FmovFrmFrn
+    id: 204
     opcode: "fmov"
     args: "{frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmov"
     pattern: "1111nnnnmmmm1100"
     fields: { n: freg, m: freg }
     defs: [frn]
@@ -1951,37 +2208,45 @@ opcodes:
 
   # FSTS / FLDS — move between FR and FPUL
   - name: FstsFpulFrn
+    id: 205
     opcode: "fsts"
     args: "fpul, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fsts"
     pattern: "1111nnnn00001101"
     fields: { n: freg }
     defs: [frn]
-    uses: [fpul]
+    uses: [fpul, fpscr]
 
   - name: FldsFrnFpul
+    id: 206
     opcode: "flds"
     args: "{frn}, fpul"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:flds"
     pattern: "1111nnnn00011101"
     fields: { n: freg }
     defs: [fpul]
-    uses: [frn]
+    uses: [frn, fpscr]
 
   # FLOAT / FTRC — int↔float conversion
   - name: FloatFpulFrn
+    id: 207
     opcode: "float"
     args: "fpul, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:float"
     pattern: "1111nnnn00101101"
     fields: { n: freg }
     defs: [frn]
     uses: [fpul, fpscr]
 
   - name: FtrcFrnFpul
+    id: 208
     opcode: "ftrc"
     args: "{frn}, fpul"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ftrc"
     pattern: "1111nnnn00111101"
     fields: { n: freg }
     defs: [fpul]
@@ -1989,27 +2254,33 @@ opcodes:
 
   # FNEG / FABS / FSQRT
   - name: FnegFrn
+    id: 209
     opcode: "fneg"
     args: "{frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fneg"
     pattern: "1111nnnn01001101"
     fields: { n: freg }
     defs: [frn]
     uses: [frn, fpscr]
 
   - name: FabsFrn
+    id: 210
     opcode: "fabs"
     args: "{frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fabs"
     pattern: "1111nnnn01011101"
     fields: { n: freg }
     defs: [frn]
     uses: [frn, fpscr]
 
   - name: FsqrtFrn
+    id: 211
     opcode: "fsqrt"
     args: "{frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fsqrt"
     pattern: "1111nnnn01101101"
     fields: { n: freg }
     defs: [frn]
@@ -2017,18 +2288,22 @@ opcodes:
 
   # FLDI0 / FLDI1
   - name: Fldi0Frn
+    id: 212
     opcode: "fldi0"
     args: "{frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fldi0"
     pattern: "1111nnnn10001101"
     fields: { n: freg }
     defs: [frn]
     uses: [fpscr]
 
   - name: Fldi1Frn
+    id: 213
     opcode: "fldi1"
     args: "{frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fldi1"
     pattern: "1111nnnn10011101"
     fields: { n: freg }
     defs: [frn]
@@ -2036,9 +2311,11 @@ opcodes:
 
   # FMAC — fused multiply-accumulate
   - name: FmacFr0FrmFrn
+    id: 214
     opcode: "fmac"
     args: "fr0, {frm}, {frn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fmac"
     pattern: "1111nnnnmmmm1110"
     fields: { n: freg, m: freg }
     defs: [frn]
@@ -2046,18 +2323,22 @@ opcodes:
 
   # FCNVSD / FCNVDS — single↔double conversion
   - name: FcnvsdFpulDrn
+    id: 215
     opcode: "fcnvsd"
     args: "fpul, {drn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fcnvsd"
     pattern: "1111nnn010101101"
     fields: { n: dreg }
     defs: [drn]
     uses: [fpul, fpscr]
 
   - name: FcnvdsDrnFpul
+    id: 216
     opcode: "fcnvds"
     args: "{drn}, fpul"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fcnvds"
     pattern: "1111nnn010111101"
     fields: { n: dreg }
     defs: [fpul]
@@ -2065,9 +2346,11 @@ opcodes:
 
   # FIPR — inner product of two 4-component vectors
   - name: FiprFvmFvn
+    id: 217
     opcode: "fipr"
     args: "{fvm}, {fvn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fipr"
     pattern: "1111nnmm11101101"
     fields: { n: vecreg, m: vecreg }
     defs: [fvn]
@@ -2075,49 +2358,34 @@ opcodes:
 
   # FTRV — matrix-vector multiply
   - name: FtrvXmtrxFvn
+    id: 218
     opcode: "ftrv"
     args: "xmtrx, {fvn}"
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:ftrv"
     pattern: "1111nn0111111101"
     fields: { n: vecreg }
     defs: [fvn]
-    uses: [fvn, fpscr]
-
-  # FSRRA — reciprocal square root approximation (single-precision)
-  - name: FsrraFrn
-    opcode: "fsrra"
-    args: "{frn}"
-    version: sh4
-    pattern: "1111nnnn01111101"
-    fields: { n: freg }
-    defs: [frn]
-    uses: [frn, fpscr]
-
-  # FSCA — sin/cos approximation; result pair stored in DRn (FRn=sin, FRn+1=cos)
-  # bit 8 is fixed 0 — the 3-bit DR index occupies bits [11:9]
-  - name: FscaFpulDrn
-    opcode: "fsca"
-    args: "fpul, {drn}"
-    version: sh4
-    pattern: "1111nnn011111101"
-    fields: { n: dreg }
-    defs: [drn]
-    uses: [fpul, fpscr]
+    uses: [xmtrx, fvn, fpscr]
 
   # FSCHG / FRCHG — toggle FPSCR bits
   - name: Fschg
+    id: 221
     opcode: "fschg"
     args: ""
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:fschg"
     pattern: "1111001111111101"
     fields: {}
     defs: [fpscr]
     uses: [fpscr]
 
   - name: Frchg
+    id: 222
     opcode: "frchg"
     args: ""
-    version: sh4
+    architectures: [sh4]
+    source: "rej09b0318:section-9:frchg"
     pattern: "1111101111111101"
     fields: {}
     defs: [fpscr]

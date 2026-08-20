@@ -1,12 +1,25 @@
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum SHVersion {
+pub enum Architecture {
     Sh1,
     Sh2,
     Sh3,
     Sh4,
+}
+
+impl Architecture {
+    pub const ALL: [Self; 4] = [Self::Sh1, Self::Sh2, Self::Sh3, Self::Sh4];
+
+    pub const fn feature(self) -> &'static str {
+        match self {
+            Self::Sh1 => "sh1",
+            Self::Sh2 => "sh2",
+            Self::Sh3 => "sh3",
+            Self::Sh4 => "sh4",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
