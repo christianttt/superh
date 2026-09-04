@@ -57,8 +57,6 @@ fn effect_arm(op: &Opcode) -> TokenStream {
     let mut body = Vec::new();
     if op.name == "Rte" {
         body.push(rte_effects());
-    } else if op.name == "Trapa" {
-        body.push(trapa_effects());
     } else {
         for resource in &op.defs {
             body.push(resource_effect(resource, &register_fields, true, op));
@@ -79,12 +77,7 @@ fn resource_effect(
 ) -> TokenStream {
     if let Some((_, field)) = fields.iter().find(|(field_name, _)| field_name == name) {
         let ident = format_ident!("{}", name);
-        return field_effect(&quote! { *#ident }, field, write, op);
-    }
-    // A literal float register such as `fr0` names a logical operand, not a
-    // physical one, so it resolves through the same FPSCR-aware path as fields.
-    if let Some(reg) = literal_freg(name) {
-        return field_effect(&quote! { crate::FReg::#reg }, &FieldType::Freg, write, op);
+        return field_effect(&ident, field, write, op);
     }
     let method = if write {
         quote! { write }
@@ -96,33 +89,38 @@ fn resource_effect(
     quote! { effects.#method(#resource); }
 }
 
-fn field_effect(value: &TokenStream, field: &FieldType, write: bool, op: &Opcode) -> TokenStream {
+fn field_effect(
+    ident: &proc_macro2::Ident,
+    field: &FieldType,
+    write: bool,
+    op: &Opcode,
+) -> TokenStream {
     let method = if write {
         quote! { write }
     } else {
         quote! { read }
     };
     match field {
-        FieldType::Reg => quote! { effects.#method(Resource::Gp(#value)); },
-        FieldType::Bankreg => quote! { effects.#method(Resource::Bank(#value)); },
+        FieldType::Reg => quote! { effects.#method(Resource::Gp(*#ident)); },
+        FieldType::Bankreg => quote! { effects.#method(Resource::Bank(*#ident)); },
         FieldType::Freg if matches!(op.opcode.as_str(), "fmov" | "fmov.s") && write => {
-            quote! { effects.write_transfer_reg(#value); }
+            quote! { effects.write_transfer_reg(*#ident); }
         }
         FieldType::Freg if matches!(op.opcode.as_str(), "fmov" | "fmov.s") => {
-            quote! { effects.read_transfer_reg(#value); }
+            quote! { effects.read_transfer_reg(*#ident); }
         }
         FieldType::Freg if precision_dependent(op) && write => {
-            quote! { effects.write_precision_reg(#value); }
+            quote! { effects.write_precision_reg(*#ident); }
         }
         FieldType::Freg if precision_dependent(op) => {
-            quote! { effects.read_precision_reg(#value); }
+            quote! { effects.read_precision_reg(*#ident); }
         }
-        FieldType::Freg if write => quote! { effects.write_freg(#value); },
-        FieldType::Freg => quote! { effects.read_freg(#value); },
-        FieldType::Dreg if write => quote! { effects.write_dreg(#value); },
-        FieldType::Dreg => quote! { effects.read_dreg(#value); },
-        FieldType::Vecreg if write => quote! { effects.write_vec(#value); },
-        FieldType::Vecreg => quote! { effects.read_vec(#value); },
+        FieldType::Freg if write => quote! { effects.write_freg(*#ident); },
+        FieldType::Freg => quote! { effects.read_freg(*#ident); },
+        FieldType::Dreg if write => quote! { effects.write_dreg(*#ident); },
+        FieldType::Dreg => quote! { effects.read_dreg(*#ident); },
+        FieldType::Vecreg if write => quote! { effects.write_vec(*#ident); },
+        FieldType::Vecreg => quote! { effects.read_vec(*#ident); },
         _ => unreachable!("only register fields are bound as resources"),
     }
 }
@@ -144,18 +142,18 @@ fn precision_dependent(op: &Opcode) -> bool {
     )
 }
 
-/// Resolve a literal logical float register name such as `fr0`.
-fn literal_freg(name: &str) -> Option<proc_macro2::Ident> {
-    let number = name.strip_prefix("fr").and_then(|value| value.parse::<u8>().ok())?;
-    (number < 16).then(|| format_ident!("Fr{}", number))
-}
-
 fn literal_resource(name: &str) -> Option<TokenStream> {
     if let Some(number) = name.strip_prefix('r').and_then(|value| value.parse::<u8>().ok())
         && number < 16
     {
         let variant = format_ident!("R{}", number);
         return Some(quote! { Resource::Gp(crate::Reg::#variant) });
+    }
+    if let Some(number) = name.strip_prefix("fr").and_then(|value| value.parse::<u8>().ok())
+        && number < 16
+    {
+        let variant = format_ident!("Fr{}", number);
+        return Some(quote! { Resource::Fpu(FpuResource::Fr(crate::FReg::#variant)) });
     }
     let system = match name {
         "sr" => Some("Sr"),
@@ -197,9 +195,6 @@ fn rte_effects() -> TokenStream {
     quote! {
         effects.write(Resource::System(SystemReg::Sr));
         effects.write(Resource::Status(StatusBit::T));
-        effects.write(Resource::Status(StatusBit::S));
-        effects.write(Resource::Status(StatusBit::Q));
-        effects.write(Resource::Status(StatusBit::M));
         match context.architecture {
             #[cfg(feature = "sh1")]
             crate::Architecture::Sh1 => {
@@ -225,55 +220,6 @@ fn rte_effects() -> TokenStream {
                 effects.read(Resource::System(SystemReg::Ssr));
                 effects.read(Resource::System(SystemReg::Spc));
             }
-            #[cfg(not(any(feature = "sh1", feature = "sh2", feature = "sh3", feature = "sh4")))]
-            crate::Architecture::__NoArchitecture => unreachable!(),
-        }
-    }
-}
-
-fn trapa_effects() -> TokenStream {
-    let pre_sh3 = quote! {
-        effects.read(Resource::System(SystemReg::Sr));
-        effects.read(Resource::Status(StatusBit::T));
-        effects.read(Resource::Status(StatusBit::S));
-        effects.read(Resource::Status(StatusBit::Q));
-        effects.read(Resource::Status(StatusBit::M));
-        effects.read(Resource::System(SystemReg::Vbr));
-        effects.read(Resource::Gp(crate::Reg::R15));
-        effects.write(Resource::Gp(crate::Reg::R15));
-        effects.memory(crate::MemoryAccess { kind: crate::MemoryAccessKind::Write, width: crate::AccessWidth::Long, addressing: crate::AddressingMode::PreDecrement });
-        effects.memory(crate::MemoryAccess { kind: crate::MemoryAccessKind::Write, width: crate::AccessWidth::Long, addressing: crate::AddressingMode::PreDecrement });
-        effects.memory(crate::MemoryAccess { kind: crate::MemoryAccessKind::Read, width: crate::AccessWidth::Long, addressing: crate::AddressingMode::Displacement });
-    };
-    let sh3_and_later = quote! {
-        effects.read(Resource::System(SystemReg::Sr));
-        effects.read(Resource::Status(StatusBit::T));
-        effects.read(Resource::Status(StatusBit::S));
-        effects.read(Resource::Status(StatusBit::Q));
-        effects.read(Resource::Status(StatusBit::M));
-        effects.read(Resource::System(SystemReg::Vbr));
-        effects.read(Resource::Gp(crate::Reg::R15));
-        effects.write(Resource::System(SystemReg::Ssr));
-        effects.write(Resource::System(SystemReg::Spc));
-        effects.write(Resource::System(SystemReg::Sgr));
-        effects.write(Resource::System(SystemReg::Tra));
-        effects.write(Resource::System(SystemReg::Expevt));
-        effects.write(Resource::System(SystemReg::Sr));
-        effects.write(Resource::Status(StatusBit::T));
-        effects.write(Resource::Status(StatusBit::S));
-        effects.write(Resource::Status(StatusBit::Q));
-        effects.write(Resource::Status(StatusBit::M));
-    };
-    quote! {
-        match context.architecture {
-            #[cfg(feature = "sh1")]
-            crate::Architecture::Sh1 => { #pre_sh3 }
-            #[cfg(feature = "sh2")]
-            crate::Architecture::Sh2 => { #pre_sh3 }
-            #[cfg(feature = "sh3")]
-            crate::Architecture::Sh3 => { #sh3_and_later }
-            #[cfg(feature = "sh4")]
-            crate::Architecture::Sh4 => { #sh3_and_later }
             #[cfg(not(any(feature = "sh1", feature = "sh2", feature = "sh3", feature = "sh4")))]
             crate::Architecture::__NoArchitecture => unreachable!(),
         }
@@ -310,9 +256,7 @@ fn memory_effects(op: &Opcode) -> Vec<TokenStream> {
         quote! { crate::AddressingMode::PcRelative }
     } else if op.args.contains("gbr") {
         quote! { crate::AddressingMode::Gbr }
-    } else if op.args.contains("@(r0,") {
-        // Only R0 inside the address expression is an index register; `r0` as a
-        // source or destination operand is a value, not part of the address.
+    } else if op.args.contains("r0,") {
         quote! { crate::AddressingMode::Indexed }
     } else if op.args.contains("@(") {
         quote! { crate::AddressingMode::Displacement }

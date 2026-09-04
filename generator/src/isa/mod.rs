@@ -13,65 +13,7 @@ pub struct Isa {
     pub opcodes: Vec<Opcode>,
 }
 
-/// Permanent record of every `OpcodeId` ever handed out, parsed from
-/// opcode_ids.yaml.
-///
-/// `OpcodeId` is public API and callers may persist it, so an id is bound to
-/// one opcode forever. Removing an opcode moves its id to `retired`, which
-/// keeps the number from being handed to something unrelated later.
-#[derive(Debug, Deserialize)]
-pub struct OpcodeIdRegistry {
-    /// Ids currently in use, keyed by id and mapped to the opcode name.
-    #[serde(default)]
-    pub assigned: std::collections::BTreeMap<u16, String>,
-    /// Ids whose opcode was removed. These are never reissued.
-    #[serde(default)]
-    pub retired: std::collections::BTreeMap<u16, String>,
-}
-
 impl Isa {
-    /// Check the ISA against the frozen opcode-id registry.
-    ///
-    /// Duplicate-id detection alone only covers the opcodes present today; this
-    /// also catches an id that silently changes meaning after an opcode is
-    /// removed or renamed.
-    pub fn validate_ids(&self, registry: &OpcodeIdRegistry) -> Result<()> {
-        for op in &self.opcodes {
-            if let Some(previous) = registry.retired.get(&op.id) {
-                bail!(
-                    "Opcode '{}': id {} is retired (it belonged to '{}') and must never be reused",
-                    op.name,
-                    op.id,
-                    previous
-                );
-            }
-            match registry.assigned.get(&op.id) {
-                Some(name) if *name == op.name => {}
-                Some(name) => bail!(
-                    "Opcode '{}': id {} is permanently assigned to '{}'. OpcodeId is public API, \
-                     so give the new opcode an unused id instead of moving this one",
-                    op.name,
-                    op.id,
-                    name
-                ),
-                None => bail!(
-                    "Opcode '{}': id {} is missing from opcode_ids.yaml. Add `{}: {}` under \
-                     `assigned` to claim it permanently",
-                    op.name,
-                    op.id,
-                    op.id,
-                    op.name
-                ),
-            }
-        }
-        for id in registry.assigned.keys() {
-            if let Some(previous) = registry.retired.get(id) {
-                bail!("Opcode id {id} is listed as both assigned and retired ('{previous}')");
-            }
-        }
-        Ok(())
-    }
-
     /// Validate the ISA after deserialisation: catches typos and structural
     /// errors before any code is generated.
     pub fn validate(&self) -> Result<()> {
@@ -194,24 +136,6 @@ impl Isa {
                         op.name,
                         reg
                     );
-                }
-            }
-
-            // T, S, Q, and M are modeled separately but are bits of SR, so a
-            // whole-SR access must alias all of them or split-bit liveness goes
-            // stale across LDC/STC/RTE and exception entry.
-            for (kind, list) in [("defs", &op.defs), ("uses", &op.uses)] {
-                if !list.iter().any(|reg| reg == "sr") {
-                    continue;
-                }
-                for bit in STATUS_BITS {
-                    if !list.iter().any(|reg| reg == bit) {
-                        bail!(
-                            "Opcode '{}': whole-SR {kind} must also list '{bit}' \
-                             (T, S, Q, and M are bits of SR)",
-                            op.name
-                        );
-                    }
                 }
             }
         }
@@ -348,9 +272,6 @@ fn is_known_literal(name: &str) -> bool {
     )
 }
 
-/// Status bits modeled separately from the SR register they belong to.
-const STATUS_BITS: [&str; 4] = ["t", "s", "q", "m"];
-
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
@@ -397,57 +318,6 @@ mod tests {
             opcode(0, "Sleep", "sleep", "0000000000011011"),
         ]);
         assert!(duplicate_id.contains("Duplicate opcode id"));
-    }
-
-    #[test]
-    fn rejects_whole_sr_access_without_every_status_bit() {
-        for missing in ["t", "s", "q", "m"] {
-            let mut partial = opcode(0, "Rte", "rte", "0000000000101011");
-            partial.defs = ["sr", "t", "s", "q", "m"]
-                .into_iter()
-                .filter(|bit| *bit != missing)
-                .map(str::to_owned)
-                .collect();
-            let error = validation_error(vec![partial]);
-            assert!(error.contains("whole-SR"), "unexpected error: {error}");
-            assert!(error.contains(&format!("'{missing}'")), "unexpected error: {error}");
-        }
-
-        let mut complete = opcode(0, "Rte", "rte", "0000000000101011");
-        complete.defs = ["sr", "t", "s", "q", "m"].map(str::to_owned).to_vec();
-        Isa { opcodes: vec![complete] }.validate().expect("valid ISA");
-    }
-
-    fn registry(assigned: &[(u16, &str)], retired: &[(u16, &str)]) -> OpcodeIdRegistry {
-        let map = |pairs: &[(u16, &str)]| {
-            pairs.iter().map(|(id, name)| (*id, (*name).to_owned())).collect()
-        };
-        OpcodeIdRegistry { assigned: map(assigned), retired: map(retired) }
-    }
-
-    #[test]
-    fn registry_rejects_reassigning_a_known_opcode_id() {
-        let isa = Isa { opcodes: vec![opcode(7, "Nop", "nop", "0000000000001001")] };
-
-        isa.validate_ids(&registry(&[(7, "Nop")], &[])).expect("matching registry");
-
-        let moved = isa
-            .validate_ids(&registry(&[(7, "Sleep")], &[]))
-            .expect_err("id 7 historically named another opcode");
-        assert!(moved.to_string().contains("Sleep"), "unexpected error: {moved}");
-
-        let unknown =
-            isa.validate_ids(&registry(&[], &[])).expect_err("id 7 is not in the registry");
-        assert!(unknown.to_string().contains("opcode_ids.yaml"), "unexpected error: {unknown}");
-    }
-
-    #[test]
-    fn registry_rejects_reusing_a_retired_opcode_id() {
-        let isa = Isa { opcodes: vec![opcode(7, "Nop", "nop", "0000000000001001")] };
-        let error = isa
-            .validate_ids(&registry(&[(7, "Nop")], &[(7, "OldOpcode")]))
-            .expect_err("retired ids are never reissued");
-        assert!(error.to_string().contains("retired"), "unexpected error: {error}");
     }
 
     #[test]

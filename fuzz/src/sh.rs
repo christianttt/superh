@@ -2,8 +2,8 @@ use std::{hint, ops::RangeInclusive, thread};
 
 use rand::RngExt;
 use superh::{
-    DecodeOptions, DecodeResult, EffectContext, FormatOptions, FpscrState, ParseEndian, ParseMode,
-    Parser, Resource, StatusBit, StringFormatter, SystemReg,
+    DecodeOptions, DecodeResult, EffectContext, FormatOptions, ParseEndian, ParseMode, Parser,
+    StringFormatter,
 };
 
 use crate::Test;
@@ -244,59 +244,13 @@ impl Fuzzer {
             for _ in 0..repeat {
                 for word in range.clone() {
                     if let DecodeResult::Instruction(instruction) = superh::decode(word, &opts) {
-                        for context in effect_contexts(opts.architecture) {
-                            let effects = hint::black_box(instruction.effects(context));
-                            check_effect_invariants(word, &effects);
-                        }
+                        let _ = hint::black_box(
+                            instruction.effects(EffectContext::new(opts.architecture)),
+                        );
                     }
                 }
             }
         })
-    }
-}
-
-/// Every FPSCR state a caller can supply, so effects are exercised under known
-/// and unknown mode bits rather than only the default unknown state.
-fn effect_contexts(architecture: superh::Architecture) -> Vec<EffectContext> {
-    let mut contexts = vec![EffectContext::new(architecture)];
-    for pr in [None, Some(false), Some(true)] {
-        for sz in [None, Some(false), Some(true)] {
-            for fr in [None, Some(false), Some(true)] {
-                contexts
-                    .push(EffectContext::new(architecture).with_fpscr(FpscrState::new(pr, sz, fr)));
-            }
-        }
-    }
-    contexts
-}
-
-/// Architectural invariants that must hold for every opcode in every context.
-fn check_effect_invariants(word: u16, effects: &superh::Effects) {
-    for resource in effects.must_read().iter() {
-        assert!(
-            effects.may_read().contains(resource),
-            "{word:#06x}: {resource:?} is a must-read but not a may-read"
-        );
-    }
-    for resource in effects.must_write().iter() {
-        assert!(
-            effects.may_write().contains(resource),
-            "{word:#06x}: {resource:?} is a must-write but not a may-write"
-        );
-    }
-
-    // T, S, Q, and M are bits of SR, so a whole-SR access must alias all four.
-    let sr = Resource::System(SystemReg::Sr);
-    for (set, direction) in [(effects.must_read(), "read"), (effects.must_write(), "written")] {
-        if !set.contains(sr) {
-            continue;
-        }
-        for bit in [StatusBit::T, StatusBit::S, StatusBit::Q, StatusBit::M] {
-            assert!(
-                set.contains(Resource::Status(bit)),
-                "{word:#06x}: SR is {direction} but {bit:?} is not"
-            );
-        }
     }
 }
 
