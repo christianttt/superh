@@ -1,4 +1,3 @@
-#[cfg(feature = "sh3")]
 use superh::SystemReg;
 use superh::{
     AccessWidth, AddressingMode, Architecture, DecodeOptions, DecodeResult, EffectContext, Effects,
@@ -24,7 +23,7 @@ fn arithmetic_effects_are_unique_and_directional() {
 #[test]
 fn effects_storage_is_compact_with_exhaustive_headroom() {
     assert_eq!(core::mem::size_of::<ResourceSet>(), 33);
-    assert_eq!(core::mem::size_of::<Effects>(), 142);
+    assert_eq!(core::mem::size_of::<Effects>(), 145);
 
     let architectures = [
         #[cfg(feature = "sh1")]
@@ -205,4 +204,81 @@ fn ftrv_reads_matrix_resource() {
     use superh::FpuResource;
     let effects = instruction(0xf1fd).effects(EffectContext::new(Architecture::Sh4));
     assert!(effects.must_read().contains(Resource::Fpu(FpuResource::Matrix)));
+}
+
+#[cfg(feature = "sh1")]
+fn assert_stack_trapa_effects(architecture: Architecture) {
+    let effects = instruction(0xc320).effects(EffectContext::new(architecture)); // trapa #0x20
+    for resource in [
+        Resource::System(SystemReg::Sr),
+        Resource::Status(StatusBit::T),
+        Resource::System(SystemReg::Vbr),
+        Resource::Gp(Reg::R15),
+    ] {
+        assert!(
+            effects.must_read().contains(resource),
+            "{architecture:?} trapa must read {resource:?}"
+        );
+    }
+    assert!(effects.must_write().contains(Resource::Gp(Reg::R15)));
+
+    let accesses: Vec<_> = effects.memory().collect();
+    assert_eq!(accesses.len(), 3, "two stack pushes and one vector fetch");
+    for push in &accesses[..2] {
+        assert_eq!(push.kind, MemoryAccessKind::Write);
+        assert_eq!(push.width, AccessWidth::Long);
+        assert_eq!(push.addressing, AddressingMode::PreDecrement);
+    }
+    assert_eq!(accesses[2].kind, MemoryAccessKind::Read);
+    assert_eq!(accesses[2].width, AccessWidth::Long);
+    assert_eq!(accesses[2].addressing, AddressingMode::Displacement);
+}
+
+#[test]
+#[cfg(feature = "sh1")]
+fn trapa_models_sh1_stack_entry() {
+    assert_stack_trapa_effects(Architecture::Sh1);
+}
+
+#[test]
+#[cfg(feature = "sh2")]
+fn trapa_models_sh2_stack_entry() {
+    assert_stack_trapa_effects(Architecture::Sh2);
+}
+
+#[test]
+#[cfg(feature = "sh3")]
+fn trapa_models_sh3_register_entry_without_sgr() {
+    let effects = instruction(0xc320).effects(EffectContext::new(Architecture::Sh3)); // trapa #0x20
+    for resource in [
+        Resource::System(SystemReg::Sr),
+        Resource::Status(StatusBit::T),
+        Resource::System(SystemReg::Vbr),
+    ] {
+        assert!(effects.must_read().contains(resource), "sh3 trapa must read {resource:?}");
+    }
+    for resource in [
+        Resource::System(SystemReg::Ssr),
+        Resource::System(SystemReg::Spc),
+        Resource::System(SystemReg::Tra),
+        Resource::System(SystemReg::Expevt),
+        Resource::System(SystemReg::Sr),
+    ] {
+        assert!(effects.must_write().contains(resource), "sh3 trapa must write {resource:?}");
+    }
+    assert!(!effects.may_read().contains(Resource::Gp(Reg::R15)));
+    assert!(!effects.may_write().contains(Resource::System(SystemReg::Sgr)));
+    assert!(!effects.may_write().contains(Resource::Status(StatusBit::T)));
+    assert_eq!(effects.memory().count(), 0);
+}
+
+#[test]
+#[cfg(feature = "sh4")]
+fn trapa_models_sh4_register_entry_with_sgr() {
+    let effects = instruction(0xc320).effects(EffectContext::new(Architecture::Sh4)); // trapa #0x20
+    assert!(effects.must_read().contains(Resource::Gp(Reg::R15)));
+    assert!(effects.must_write().contains(Resource::System(SystemReg::Sgr)));
+    assert!(effects.must_write().contains(Resource::System(SystemReg::Tra)));
+    assert!(effects.must_write().contains(Resource::System(SystemReg::Expevt)));
+    assert_eq!(effects.memory().count(), 0);
 }

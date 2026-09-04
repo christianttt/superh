@@ -57,6 +57,8 @@ fn effect_arm(op: &Opcode) -> TokenStream {
     let mut body = Vec::new();
     if op.name == "Rte" {
         body.push(rte_effects());
+    } else if op.name == "Trapa" {
+        body.push(trapa_effects());
     } else {
         for resource in &op.defs {
             body.push(resource_effect(resource, &register_fields, true, op));
@@ -219,6 +221,47 @@ fn rte_effects() -> TokenStream {
             crate::Architecture::Sh4 => {
                 effects.read(Resource::System(SystemReg::Ssr));
                 effects.read(Resource::System(SystemReg::Spc));
+            }
+            #[cfg(not(any(feature = "sh1", feature = "sh2", feature = "sh3", feature = "sh4")))]
+            crate::Architecture::__NoArchitecture => unreachable!(),
+        }
+    }
+}
+
+fn trapa_effects() -> TokenStream {
+    let pre_sh3 = quote! {
+        effects.read(Resource::System(SystemReg::Sr));
+        effects.read(Resource::Status(StatusBit::T));
+        effects.read(Resource::System(SystemReg::Vbr));
+        effects.read(Resource::Gp(crate::Reg::R15));
+        effects.write(Resource::Gp(crate::Reg::R15));
+        effects.memory(crate::MemoryAccess { kind: crate::MemoryAccessKind::Write, width: crate::AccessWidth::Long, addressing: crate::AddressingMode::PreDecrement });
+        effects.memory(crate::MemoryAccess { kind: crate::MemoryAccessKind::Write, width: crate::AccessWidth::Long, addressing: crate::AddressingMode::PreDecrement });
+        effects.memory(crate::MemoryAccess { kind: crate::MemoryAccessKind::Read, width: crate::AccessWidth::Long, addressing: crate::AddressingMode::Displacement });
+    };
+    let sh3_and_later = quote! {
+        effects.read(Resource::System(SystemReg::Sr));
+        effects.read(Resource::Status(StatusBit::T));
+        effects.read(Resource::System(SystemReg::Vbr));
+        effects.write(Resource::System(SystemReg::Ssr));
+        effects.write(Resource::System(SystemReg::Spc));
+        effects.write(Resource::System(SystemReg::Tra));
+        effects.write(Resource::System(SystemReg::Expevt));
+        effects.write(Resource::System(SystemReg::Sr));
+    };
+    quote! {
+        match context.architecture {
+            #[cfg(feature = "sh1")]
+            crate::Architecture::Sh1 => { #pre_sh3 }
+            #[cfg(feature = "sh2")]
+            crate::Architecture::Sh2 => { #pre_sh3 }
+            #[cfg(feature = "sh3")]
+            crate::Architecture::Sh3 => { #sh3_and_later }
+            #[cfg(feature = "sh4")]
+            crate::Architecture::Sh4 => {
+                #sh3_and_later
+                effects.read(Resource::Gp(crate::Reg::R15));
+                effects.write(Resource::System(SystemReg::Sgr));
             }
             #[cfg(not(any(feature = "sh1", feature = "sh2", feature = "sh3", feature = "sh4")))]
             crate::Architecture::__NoArchitecture => unreachable!(),

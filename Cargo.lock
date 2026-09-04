@@ -266,11 +266,11 @@ dependencies = [
 
 [[package]]
 name = "superh"
-version = "0.2.0"
+version = "0.2.2"
 
 [[package]]
 name = "superh-fuzz"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "rand",
  "superh",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "superh-generator"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "indexmap",

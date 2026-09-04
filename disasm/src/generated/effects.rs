@@ -899,7 +899,97 @@ impl Ins {
             Self::Sleep => {}
             #[cfg(any(feature = "sh3", feature = "sh4"))]
             Self::Ldtlb => {}
-            Self::Trapa { .. } => {}
+            Self::Trapa { .. } => {
+                match context.architecture {
+                    #[cfg(feature = "sh1")]
+                    crate::Architecture::Sh1 => {
+                        effects.read(Resource::System(SystemReg::Sr));
+                        effects.read(Resource::Status(StatusBit::T));
+                        effects.read(Resource::System(SystemReg::Vbr));
+                        effects.read(Resource::Gp(crate::Reg::R15));
+                        effects.write(Resource::Gp(crate::Reg::R15));
+                        effects
+                            .memory(crate::MemoryAccess {
+                                kind: crate::MemoryAccessKind::Write,
+                                width: crate::AccessWidth::Long,
+                                addressing: crate::AddressingMode::PreDecrement,
+                            });
+                        effects
+                            .memory(crate::MemoryAccess {
+                                kind: crate::MemoryAccessKind::Write,
+                                width: crate::AccessWidth::Long,
+                                addressing: crate::AddressingMode::PreDecrement,
+                            });
+                        effects
+                            .memory(crate::MemoryAccess {
+                                kind: crate::MemoryAccessKind::Read,
+                                width: crate::AccessWidth::Long,
+                                addressing: crate::AddressingMode::Displacement,
+                            });
+                    }
+                    #[cfg(feature = "sh2")]
+                    crate::Architecture::Sh2 => {
+                        effects.read(Resource::System(SystemReg::Sr));
+                        effects.read(Resource::Status(StatusBit::T));
+                        effects.read(Resource::System(SystemReg::Vbr));
+                        effects.read(Resource::Gp(crate::Reg::R15));
+                        effects.write(Resource::Gp(crate::Reg::R15));
+                        effects
+                            .memory(crate::MemoryAccess {
+                                kind: crate::MemoryAccessKind::Write,
+                                width: crate::AccessWidth::Long,
+                                addressing: crate::AddressingMode::PreDecrement,
+                            });
+                        effects
+                            .memory(crate::MemoryAccess {
+                                kind: crate::MemoryAccessKind::Write,
+                                width: crate::AccessWidth::Long,
+                                addressing: crate::AddressingMode::PreDecrement,
+                            });
+                        effects
+                            .memory(crate::MemoryAccess {
+                                kind: crate::MemoryAccessKind::Read,
+                                width: crate::AccessWidth::Long,
+                                addressing: crate::AddressingMode::Displacement,
+                            });
+                    }
+                    #[cfg(feature = "sh3")]
+                    crate::Architecture::Sh3 => {
+                        effects.read(Resource::System(SystemReg::Sr));
+                        effects.read(Resource::Status(StatusBit::T));
+                        effects.read(Resource::System(SystemReg::Vbr));
+                        effects.write(Resource::System(SystemReg::Ssr));
+                        effects.write(Resource::System(SystemReg::Spc));
+                        effects.write(Resource::System(SystemReg::Tra));
+                        effects.write(Resource::System(SystemReg::Expevt));
+                        effects.write(Resource::System(SystemReg::Sr));
+                    }
+                    #[cfg(feature = "sh4")]
+                    crate::Architecture::Sh4 => {
+                        effects.read(Resource::System(SystemReg::Sr));
+                        effects.read(Resource::Status(StatusBit::T));
+                        effects.read(Resource::System(SystemReg::Vbr));
+                        effects.write(Resource::System(SystemReg::Ssr));
+                        effects.write(Resource::System(SystemReg::Spc));
+                        effects.write(Resource::System(SystemReg::Tra));
+                        effects.write(Resource::System(SystemReg::Expevt));
+                        effects.write(Resource::System(SystemReg::Sr));
+                        effects.read(Resource::Gp(crate::Reg::R15));
+                        effects.write(Resource::System(SystemReg::Sgr));
+                    }
+                    #[cfg(
+                        not(
+                            any(
+                                feature = "sh1",
+                                feature = "sh2",
+                                feature = "sh3",
+                                feature = "sh4"
+                            )
+                        )
+                    )]
+                    crate::Architecture::__NoArchitecture => unreachable!(),
+                }
+            }
             Self::StcSrRn { rn, .. } => {
                 effects.write(Resource::Gp(*rn));
                 effects.read(Resource::System(SystemReg::Sr));

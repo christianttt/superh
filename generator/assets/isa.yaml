@@ -1434,6 +1434,8 @@ opcodes:
     defs: []
     uses: []
 
+  # Trap entry differs by architecture, so effects are emitted by the
+  # generator's dedicated trapa_effects() path rather than these lists.
   - name: Trapa
     id: 123
     opcode: "trapa"
