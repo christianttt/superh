@@ -7,7 +7,7 @@ use crate::{Architecture, Reg};
 use crate::{DReg, FReg, VecReg};
 
 const MAX_RESOURCES: usize = 16;
-const MAX_MEMORY_ACCESSES: usize = 2;
+const MAX_MEMORY_ACCESSES: usize = 3;
 
 /// A control or system register tracked by data-flow analysis.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -37,6 +37,10 @@ pub enum SystemReg {
     Fpul,
     /// Floating-point status/control register.
     Fpscr,
+    /// TRAPA exception register holding the trap immediate.
+    Tra,
+    /// Exception event register.
+    Expevt,
 }
 
 /// An individually addressable status-register bit.

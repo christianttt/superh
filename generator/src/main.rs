@@ -3,7 +3,7 @@ mod isa;
 mod util;
 
 use anyhow::{Context, Result};
-use isa::Isa;
+use isa::{Isa, OpcodeIdRegistry};
 use std::{fs, path::Path};
 
 fn main() -> Result<()> {
@@ -14,6 +14,12 @@ fn main() -> Result<()> {
     let yaml_src = fs::read_to_string(assets_dir.join("isa.yaml")).context("reading isa.yaml")?;
     let isa: Isa = serde_yaml::from_str(&yaml_src).context("parsing isa.yaml")?;
     isa.validate().context("validating isa.yaml")?;
+
+    let registry_src = fs::read_to_string(assets_dir.join("opcode_ids.yaml"))
+        .context("reading opcode_ids.yaml")?;
+    let registry: OpcodeIdRegistry =
+        serde_yaml::from_str(&registry_src).context("parsing opcode_ids.yaml")?;
+    isa.validate_ids(&registry).context("validating opcode ids against opcode_ids.yaml")?;
 
     let out_dir = workspace_dir.join("disasm/src/generated");
     fs::create_dir_all(&out_dir).context("creating generated dir")?;

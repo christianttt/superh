@@ -1,6 +1,6 @@
 [package]
 name = "superh-generator"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Generates Rust code for superh from isa.yaml"
 publish = false
@@ -14,10 +14,10 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.104"
-indexmap = { version = "2.14.0", features = ["serde"] }
+indexmap = { version = "2.14.1", features = ["serde"] }
 prettyplease = "0.3.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_yaml = "0.9.34"
-syn = { version = "3.0.3", features = ["full", "extra-traits"] }
+syn = { version = "3.0.4", features = ["full", "extra-traits"] }
