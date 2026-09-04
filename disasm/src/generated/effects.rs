@@ -183,7 +183,7 @@ impl Ins {
                     .memory(crate::MemoryAccess {
                         kind: crate::MemoryAccessKind::Write,
                         width: crate::AccessWidth::Byte,
-                        addressing: crate::AddressingMode::Displacement,
+                        addressing: crate::AddressingMode::Indexed,
                     });
             }
             Self::MovwR0AtDispRn { rn, .. } => {
@@ -193,7 +193,7 @@ impl Ins {
                     .memory(crate::MemoryAccess {
                         kind: crate::MemoryAccessKind::Write,
                         width: crate::AccessWidth::Word,
-                        addressing: crate::AddressingMode::Displacement,
+                        addressing: crate::AddressingMode::Indexed,
                     });
             }
             Self::MovlRmAtDispRn { rn, rm, .. } => {
@@ -383,7 +383,7 @@ impl Ins {
                     .memory(crate::MemoryAccess {
                         kind: crate::MemoryAccessKind::Write,
                         width: crate::AccessWidth::Long,
-                        addressing: crate::AddressingMode::Indirect,
+                        addressing: crate::AddressingMode::Indexed,
                     });
             }
             Self::SwapbRmRn { rn, rm, .. } => {
@@ -531,7 +531,6 @@ impl Ins {
                 effects.read(Resource::Gp(*rm));
                 effects.read(Resource::System(SystemReg::Mach));
                 effects.read(Resource::System(SystemReg::Macl));
-                effects.read(Resource::Status(StatusBit::S));
                 effects
                     .memory(crate::MemoryAccess {
                         kind: crate::MemoryAccessKind::Read,
@@ -554,7 +553,6 @@ impl Ins {
                 effects.read(Resource::Gp(*rm));
                 effects.read(Resource::System(SystemReg::Mach));
                 effects.read(Resource::System(SystemReg::Macl));
-                effects.read(Resource::Status(StatusBit::S));
                 effects
                     .memory(crate::MemoryAccess {
                         kind: crate::MemoryAccessKind::Read,
@@ -821,9 +819,6 @@ impl Ins {
             Self::Rte => {
                 effects.write(Resource::System(SystemReg::Sr));
                 effects.write(Resource::Status(StatusBit::T));
-                effects.write(Resource::Status(StatusBit::S));
-                effects.write(Resource::Status(StatusBit::Q));
-                effects.write(Resource::Status(StatusBit::M));
                 match context.architecture {
                     #[cfg(feature = "sh1")]
                     crate::Architecture::Sh1 => {
@@ -904,126 +899,11 @@ impl Ins {
             Self::Sleep => {}
             #[cfg(any(feature = "sh3", feature = "sh4"))]
             Self::Ldtlb => {}
-            Self::Trapa { .. } => {
-                match context.architecture {
-                    #[cfg(feature = "sh1")]
-                    crate::Architecture::Sh1 => {
-                        effects.read(Resource::System(SystemReg::Sr));
-                        effects.read(Resource::Status(StatusBit::T));
-                        effects.read(Resource::Status(StatusBit::S));
-                        effects.read(Resource::Status(StatusBit::Q));
-                        effects.read(Resource::Status(StatusBit::M));
-                        effects.read(Resource::System(SystemReg::Vbr));
-                        effects.read(Resource::Gp(crate::Reg::R15));
-                        effects.write(Resource::Gp(crate::Reg::R15));
-                        effects
-                            .memory(crate::MemoryAccess {
-                                kind: crate::MemoryAccessKind::Write,
-                                width: crate::AccessWidth::Long,
-                                addressing: crate::AddressingMode::PreDecrement,
-                            });
-                        effects
-                            .memory(crate::MemoryAccess {
-                                kind: crate::MemoryAccessKind::Write,
-                                width: crate::AccessWidth::Long,
-                                addressing: crate::AddressingMode::PreDecrement,
-                            });
-                        effects
-                            .memory(crate::MemoryAccess {
-                                kind: crate::MemoryAccessKind::Read,
-                                width: crate::AccessWidth::Long,
-                                addressing: crate::AddressingMode::Displacement,
-                            });
-                    }
-                    #[cfg(feature = "sh2")]
-                    crate::Architecture::Sh2 => {
-                        effects.read(Resource::System(SystemReg::Sr));
-                        effects.read(Resource::Status(StatusBit::T));
-                        effects.read(Resource::Status(StatusBit::S));
-                        effects.read(Resource::Status(StatusBit::Q));
-                        effects.read(Resource::Status(StatusBit::M));
-                        effects.read(Resource::System(SystemReg::Vbr));
-                        effects.read(Resource::Gp(crate::Reg::R15));
-                        effects.write(Resource::Gp(crate::Reg::R15));
-                        effects
-                            .memory(crate::MemoryAccess {
-                                kind: crate::MemoryAccessKind::Write,
-                                width: crate::AccessWidth::Long,
-                                addressing: crate::AddressingMode::PreDecrement,
-                            });
-                        effects
-                            .memory(crate::MemoryAccess {
-                                kind: crate::MemoryAccessKind::Write,
-                                width: crate::AccessWidth::Long,
-                                addressing: crate::AddressingMode::PreDecrement,
-                            });
-                        effects
-                            .memory(crate::MemoryAccess {
-                                kind: crate::MemoryAccessKind::Read,
-                                width: crate::AccessWidth::Long,
-                                addressing: crate::AddressingMode::Displacement,
-                            });
-                    }
-                    #[cfg(feature = "sh3")]
-                    crate::Architecture::Sh3 => {
-                        effects.read(Resource::System(SystemReg::Sr));
-                        effects.read(Resource::Status(StatusBit::T));
-                        effects.read(Resource::Status(StatusBit::S));
-                        effects.read(Resource::Status(StatusBit::Q));
-                        effects.read(Resource::Status(StatusBit::M));
-                        effects.read(Resource::System(SystemReg::Vbr));
-                        effects.read(Resource::Gp(crate::Reg::R15));
-                        effects.write(Resource::System(SystemReg::Ssr));
-                        effects.write(Resource::System(SystemReg::Spc));
-                        effects.write(Resource::System(SystemReg::Sgr));
-                        effects.write(Resource::System(SystemReg::Tra));
-                        effects.write(Resource::System(SystemReg::Expevt));
-                        effects.write(Resource::System(SystemReg::Sr));
-                        effects.write(Resource::Status(StatusBit::T));
-                        effects.write(Resource::Status(StatusBit::S));
-                        effects.write(Resource::Status(StatusBit::Q));
-                        effects.write(Resource::Status(StatusBit::M));
-                    }
-                    #[cfg(feature = "sh4")]
-                    crate::Architecture::Sh4 => {
-                        effects.read(Resource::System(SystemReg::Sr));
-                        effects.read(Resource::Status(StatusBit::T));
-                        effects.read(Resource::Status(StatusBit::S));
-                        effects.read(Resource::Status(StatusBit::Q));
-                        effects.read(Resource::Status(StatusBit::M));
-                        effects.read(Resource::System(SystemReg::Vbr));
-                        effects.read(Resource::Gp(crate::Reg::R15));
-                        effects.write(Resource::System(SystemReg::Ssr));
-                        effects.write(Resource::System(SystemReg::Spc));
-                        effects.write(Resource::System(SystemReg::Sgr));
-                        effects.write(Resource::System(SystemReg::Tra));
-                        effects.write(Resource::System(SystemReg::Expevt));
-                        effects.write(Resource::System(SystemReg::Sr));
-                        effects.write(Resource::Status(StatusBit::T));
-                        effects.write(Resource::Status(StatusBit::S));
-                        effects.write(Resource::Status(StatusBit::Q));
-                        effects.write(Resource::Status(StatusBit::M));
-                    }
-                    #[cfg(
-                        not(
-                            any(
-                                feature = "sh1",
-                                feature = "sh2",
-                                feature = "sh3",
-                                feature = "sh4"
-                            )
-                        )
-                    )]
-                    crate::Architecture::__NoArchitecture => unreachable!(),
-                }
-            }
+            Self::Trapa { .. } => {}
             Self::StcSrRn { rn, .. } => {
                 effects.write(Resource::Gp(*rn));
                 effects.read(Resource::System(SystemReg::Sr));
                 effects.read(Resource::Status(StatusBit::T));
-                effects.read(Resource::Status(StatusBit::S));
-                effects.read(Resource::Status(StatusBit::Q));
-                effects.read(Resource::Status(StatusBit::M));
             }
             Self::StcGbrRn { rn, .. } => {
                 effects.write(Resource::Gp(*rn));
@@ -1063,9 +943,6 @@ impl Ins {
                 effects.read(Resource::Gp(*rn));
                 effects.read(Resource::System(SystemReg::Sr));
                 effects.read(Resource::Status(StatusBit::T));
-                effects.read(Resource::Status(StatusBit::S));
-                effects.read(Resource::Status(StatusBit::Q));
-                effects.read(Resource::Status(StatusBit::M));
                 effects
                     .memory(crate::MemoryAccess {
                         kind: crate::MemoryAccessKind::Write,
@@ -1158,9 +1035,6 @@ impl Ins {
             Self::LdcRmSr { rm, .. } => {
                 effects.write(Resource::System(SystemReg::Sr));
                 effects.write(Resource::Status(StatusBit::T));
-                effects.write(Resource::Status(StatusBit::S));
-                effects.write(Resource::Status(StatusBit::Q));
-                effects.write(Resource::Status(StatusBit::M));
                 effects.read(Resource::Gp(*rm));
             }
             Self::LdcRmGbr { rm, .. } => {
@@ -1195,9 +1069,6 @@ impl Ins {
                 effects.write(Resource::Gp(*rm));
                 effects.write(Resource::System(SystemReg::Sr));
                 effects.write(Resource::Status(StatusBit::T));
-                effects.write(Resource::Status(StatusBit::S));
-                effects.write(Resource::Status(StatusBit::Q));
-                effects.write(Resource::Status(StatusBit::M));
                 effects.read(Resource::Gp(*rm));
                 effects
                     .memory(crate::MemoryAccess {
@@ -1453,7 +1324,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FaddFrmFrn { frn, frm, .. } => {
                 effects.write_precision_reg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frm);
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1461,7 +1331,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FsubFrmFrn { frn, frm, .. } => {
                 effects.write_precision_reg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frm);
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1469,7 +1338,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FmulFrmFrn { frn, frm, .. } => {
                 effects.write_precision_reg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frm);
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1477,7 +1345,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FdivFrmFrn { frn, frm, .. } => {
                 effects.write_precision_reg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frm);
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1485,7 +1352,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FcmpeqFrmFrn { frn, frm, .. } => {
                 effects.write(Resource::Status(StatusBit::T));
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frm);
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1493,7 +1359,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FcmpgtFrmFrn { frn, frm, .. } => {
                 effects.write(Resource::Status(StatusBit::T));
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frm);
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1595,14 +1460,12 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FloatFpulFrn { frn, .. } => {
                 effects.write_precision_reg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read(Resource::System(SystemReg::Fpul));
                 effects.read(Resource::System(SystemReg::Fpscr));
             }
             #[cfg(feature = "sh4")]
             Self::FtrcFrnFpul { frn, .. } => {
                 effects.write(Resource::System(SystemReg::Fpul));
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
             }
@@ -1621,7 +1484,6 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FsqrtFrn { frn, .. } => {
                 effects.write_precision_reg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_precision_reg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
             }
@@ -1638,8 +1500,7 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FmacFr0FrmFrn { frn, frm, .. } => {
                 effects.write_freg(*frn);
-                effects.write(Resource::System(SystemReg::Fpscr));
-                effects.read_freg(crate::FReg::Fr0);
+                effects.read(Resource::Fpu(FpuResource::Fr(crate::FReg::Fr0)));
                 effects.read_freg(*frm);
                 effects.read_freg(*frn);
                 effects.read(Resource::System(SystemReg::Fpscr));
@@ -1647,14 +1508,12 @@ impl Ins {
             #[cfg(feature = "sh4")]
             Self::FcnvsdFpulDrn { drn, .. } => {
                 effects.write_dreg(*drn);
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read(Resource::System(SystemReg::Fpul));
                 effects.read(Resource::System(SystemReg::Fpscr));
             }
             #[cfg(feature = "sh4")]
             Self::FcnvdsDrnFpul { drn, .. } => {
                 effects.write(Resource::System(SystemReg::Fpul));
-                effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read_dreg(*drn);
                 effects.read(Resource::System(SystemReg::Fpscr));
             }
