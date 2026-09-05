@@ -1,6 +1,6 @@
 [package]
 name = "superh"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["christianttt"]
 edition = "2024"
 description = "Disassembler for the SuperH (SH) instruction set (SH1/2/3/4)"

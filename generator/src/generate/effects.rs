@@ -9,9 +9,6 @@ pub fn generate_effects(isa: &Isa) -> TokenStream {
         use crate::{
             EffectContext, Effects, EffectsBuilder, Ins, Resource, StatusBit, SystemReg,
         };
-        #[cfg(feature = "sh4")]
-        use crate::FpuResource;
-
         impl Ins {
             /// Return contextual register, memory, and control-flow effects.
             pub fn effects(&self, context: EffectContext) -> Effects {
@@ -81,11 +78,34 @@ fn resource_effect(
         let ident = format_ident!("{}", name);
         return field_effect(&ident, field, write, op);
     }
+    if let Some(number) = name.strip_prefix("fr").and_then(|value| value.parse::<u8>().ok())
+        && number < 16
+    {
+        let variant = format_ident!("Fr{}", number);
+        let method = if write {
+            quote! { write_freg }
+        } else {
+            quote! { read_freg }
+        };
+        return quote! { effects.#method(crate::FReg::#variant); };
+    }
     let method = if write {
         quote! { write }
     } else {
         quote! { read }
     };
+    if name == "xmtrx" && !write {
+        return quote! { effects.read_matrix(); };
+    }
+    if op.name == "MacwAtRmIncAtRnInc" && name == "mach" {
+        // Saturating MAC.W can leave MACH untouched. S is not known in
+        // EffectContext, so neither its read nor its write is definite.
+        return if write {
+            quote! { effects.insert_write(Resource::System(SystemReg::Mach), false); }
+        } else {
+            quote! { effects.insert_read(Resource::System(SystemReg::Mach), false); }
+        };
+    }
     let resource = literal_resource(name)
         .unwrap_or_else(|| panic!("opcode '{}': unknown effect resource '{name}'", op.name));
     quote! { effects.#method(#resource); }
@@ -121,6 +141,10 @@ fn field_effect(
         FieldType::Freg => quote! { effects.read_freg(*#ident); },
         FieldType::Dreg if write => quote! { effects.write_dreg(*#ident); },
         FieldType::Dreg => quote! { effects.read_dreg(*#ident); },
+        FieldType::Vecreg if write && op.name == "FiprFvmFvn" => {
+            // FIPR writes only the last lane of its destination vector.
+            quote! { effects.write_freg(crate::FReg::from_u8(#ident.number() + 3)); }
+        }
         FieldType::Vecreg if write => quote! { effects.write_vec(*#ident); },
         FieldType::Vecreg => quote! { effects.read_vec(*#ident); },
         _ => unreachable!("only register fields are bound as resources"),
@@ -150,12 +174,6 @@ fn literal_resource(name: &str) -> Option<TokenStream> {
     {
         let variant = format_ident!("R{}", number);
         return Some(quote! { Resource::Gp(crate::Reg::#variant) });
-    }
-    if let Some(number) = name.strip_prefix("fr").and_then(|value| value.parse::<u8>().ok())
-        && number < 16
-    {
-        let variant = format_ident!("Fr{}", number);
-        return Some(quote! { Resource::Fpu(FpuResource::Fr(crate::FReg::#variant)) });
     }
     let system = match name {
         "sr" => Some("Sr"),
@@ -187,16 +205,16 @@ fn literal_resource(name: &str) -> Option<TokenStream> {
         let status = format_ident!("{}", status);
         return Some(quote! { Resource::Status(StatusBit::#status) });
     }
-    match name {
-        "xmtrx" => Some(quote! { Resource::Fpu(FpuResource::Matrix) }),
-        _ => None,
-    }
+    None
 }
 
 fn rte_effects() -> TokenStream {
     quote! {
         effects.write(Resource::System(SystemReg::Sr));
         effects.write(Resource::Status(StatusBit::T));
+        effects.write(Resource::Status(StatusBit::S));
+        effects.write(Resource::Status(StatusBit::Q));
+        effects.write(Resource::Status(StatusBit::M));
         match context.architecture {
             #[cfg(feature = "sh1")]
             crate::Architecture::Sh1 => {
@@ -232,6 +250,9 @@ fn trapa_effects() -> TokenStream {
     let pre_sh3 = quote! {
         effects.read(Resource::System(SystemReg::Sr));
         effects.read(Resource::Status(StatusBit::T));
+        effects.read(Resource::Status(StatusBit::S));
+        effects.read(Resource::Status(StatusBit::Q));
+        effects.read(Resource::Status(StatusBit::M));
         effects.read(Resource::System(SystemReg::Vbr));
         effects.read(Resource::Gp(crate::Reg::R15));
         effects.write(Resource::Gp(crate::Reg::R15));
@@ -242,6 +263,9 @@ fn trapa_effects() -> TokenStream {
     let sh3_and_later = quote! {
         effects.read(Resource::System(SystemReg::Sr));
         effects.read(Resource::Status(StatusBit::T));
+        effects.read(Resource::Status(StatusBit::S));
+        effects.read(Resource::Status(StatusBit::Q));
+        effects.read(Resource::Status(StatusBit::M));
         effects.read(Resource::System(SystemReg::Vbr));
         effects.write(Resource::System(SystemReg::Ssr));
         effects.write(Resource::System(SystemReg::Spc));
@@ -279,7 +303,7 @@ fn memory_effects(op: &Opcode) -> Vec<TokenStream> {
     }
     let kind = if matches!(mnemonic, "and.b" | "or.b" | "tas.b" | "xor.b") {
         quote! { crate::MemoryAccessKind::ReadWrite }
-    } else if op.args.starts_with('@') {
+    } else if mnemonic == "tst.b" || op.args.starts_with('@') {
         quote! { crate::MemoryAccessKind::Read }
     } else {
         quote! { crate::MemoryAccessKind::Write }
@@ -299,7 +323,7 @@ fn memory_effects(op: &Opcode) -> Vec<TokenStream> {
         quote! { crate::AddressingMode::PcRelative }
     } else if op.args.contains("gbr") {
         quote! { crate::AddressingMode::Gbr }
-    } else if op.args.contains("r0,") {
+    } else if op.args.contains("@(r0,") {
         quote! { crate::AddressingMode::Indexed }
     } else if op.args.contains("@(") {
         quote! { crate::AddressingMode::Displacement }

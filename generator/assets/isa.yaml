@@ -752,7 +752,7 @@ opcodes:
     pattern: "0000nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [rn, rm, mach, macl]
-    uses: [rn, rm, mach, macl]
+    uses: [rn, rm, mach, macl, s]
 
   - name: MacwAtRmIncAtRnInc
     id: 64
@@ -763,7 +763,7 @@ opcodes:
     pattern: "0100nnnnmmmm1111"
     fields: { n: reg, m: reg }
     defs: [rn, rm, mach, macl]
-    uses: [rn, rm, mach, macl]
+    uses: [rn, rm, mach, macl, s]
 
   - name: MullRmRn
     id: 65
@@ -1328,9 +1328,9 @@ opcodes:
     defs: []
     uses: [pr]
 
-  # rte restores SR (and therefore the T bit) — from SSR on SH3+, from the
-  # stack on SH1/SH2. The whole-SR write must be modeled so dataflow analysis
-  # does not treat T as live across an rte.
+  # rte restores SR, including the independently tracked T/S/Q/M bits — from
+  # SSR on SH3+, from the stack on SH1/SH2. The effects generator handles
+  # these architecture-specific sources.
   - name: Rte
     id: 114
     opcode: "rte"
@@ -1339,7 +1339,7 @@ opcodes:
     source: "rej09b0171:section-6:rte"
     pattern: "0000000000101011"
     fields: {}
-    defs: [sr, t]
+    defs: [sr, t, s, q, m]
     uses: [ssr, spc]
 
   # ---------------------------------------------------------------------------
@@ -1448,8 +1448,7 @@ opcodes:
     uses: []
 
   # STC — store control register to Rn
-  # Instructions that read or write SR as a whole also read/write the T bit
-  # (T is bit 0 of SR), so they list both sr and t.
+  # Whole-SR transfers also read/write each independently tracked status bit.
   - name: StcSrRn
     id: 124
     opcode: "stc"
@@ -1459,7 +1458,7 @@ opcodes:
     pattern: "0000nnnn00000010"
     fields: { n: reg }
     defs: [rn]
-    uses: [sr, t]
+    uses: [sr, t, s, q, m]
 
   - name: StcGbrRn
     id: 125
@@ -1548,7 +1547,7 @@ opcodes:
     pattern: "0100nnnn00000011"
     fields: { n: reg }
     defs: [rn]
-    uses: [rn, sr, t]
+    uses: [rn, sr, t, s, q, m]
 
   - name: StclGbrAtDecRn
     id: 136
@@ -1639,7 +1638,7 @@ opcodes:
     source: "rej09b0171:section-6:ldc"
     pattern: "0100mmmm00001110"
     fields: { m: reg }
-    defs: [sr, t]
+    defs: [sr, t, s, q, m]
     uses: [rm]
 
   - name: LdcRmGbr
@@ -1717,7 +1716,7 @@ opcodes:
     source: "rej09b0171:section-6:ldc.l"
     pattern: "0100mmmm00000111"
     fields: { m: reg }
-    defs: [rm, sr, t]
+    defs: [rm, sr, t, s, q, m]
     uses: [rm]
 
   - name: LdclAtRmIncGbr
@@ -2071,7 +2070,7 @@ opcodes:
     source: "rej09b0318:section-9:fadd"
     pattern: "1111nnnnmmmm0000"
     fields: { n: freg, m: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [frm, frn, fpscr]
 
   - name: FsubFrmFrn
@@ -2082,7 +2081,7 @@ opcodes:
     source: "rej09b0318:section-9:fsub"
     pattern: "1111nnnnmmmm0001"
     fields: { n: freg, m: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [frm, frn, fpscr]
 
   - name: FmulFrmFrn
@@ -2093,7 +2092,7 @@ opcodes:
     source: "rej09b0318:section-9:fmul"
     pattern: "1111nnnnmmmm0010"
     fields: { n: freg, m: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [frm, frn, fpscr]
 
   - name: FdivFrmFrn
@@ -2104,7 +2103,7 @@ opcodes:
     source: "rej09b0318:section-9:fdiv"
     pattern: "1111nnnnmmmm0011"
     fields: { n: freg, m: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [frm, frn, fpscr]
 
   - name: FcmpeqFrmFrn
@@ -2115,7 +2114,7 @@ opcodes:
     source: "rej09b0318:section-9:fcmp/eq"
     pattern: "1111nnnnmmmm0100"
     fields: { n: freg, m: freg }
-    defs: [t]
+    defs: [t, fpscr]
     uses: [frm, frn, fpscr]
 
   - name: FcmpgtFrmFrn
@@ -2126,7 +2125,7 @@ opcodes:
     source: "rej09b0318:section-9:fcmp/gt"
     pattern: "1111nnnnmmmm0101"
     fields: { n: freg, m: freg }
-    defs: [t]
+    defs: [t, fpscr]
     uses: [frm, frn, fpscr]
 
   # FMOV — transfer encodings. Static rendering uses the SZ=0 mnemonic;
@@ -2240,7 +2239,7 @@ opcodes:
     source: "rej09b0318:section-9:float"
     pattern: "1111nnnn00101101"
     fields: { n: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [fpul, fpscr]
 
   - name: FtrcFrnFpul
@@ -2251,7 +2250,7 @@ opcodes:
     source: "rej09b0318:section-9:ftrc"
     pattern: "1111nnnn00111101"
     fields: { n: freg }
-    defs: [fpul]
+    defs: [fpul, fpscr]
     uses: [frn, fpscr]
 
   # FNEG / FABS / FSQRT
@@ -2285,7 +2284,7 @@ opcodes:
     source: "rej09b0318:section-9:fsqrt"
     pattern: "1111nnnn01101101"
     fields: { n: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [frn, fpscr]
 
   # FLDI0 / FLDI1
@@ -2320,7 +2319,7 @@ opcodes:
     source: "rej09b0318:section-9:fmac"
     pattern: "1111nnnnmmmm1110"
     fields: { n: freg, m: freg }
-    defs: [frn]
+    defs: [frn, fpscr]
     uses: [fr0, frm, frn, fpscr]
 
   # FCNVSD / FCNVDS — single↔double conversion
@@ -2332,7 +2331,7 @@ opcodes:
     source: "rej09b0318:section-9:fcnvsd"
     pattern: "1111nnn010101101"
     fields: { n: dreg }
-    defs: [drn]
+    defs: [drn, fpscr]
     uses: [fpul, fpscr]
 
   - name: FcnvdsDrnFpul
@@ -2343,7 +2342,7 @@ opcodes:
     source: "rej09b0318:section-9:fcnvds"
     pattern: "1111nnn010111101"
     fields: { n: dreg }
-    defs: [fpul]
+    defs: [fpul, fpscr]
     uses: [drn, fpscr]
 
   # FIPR — inner product of two 4-component vectors
@@ -2355,7 +2354,7 @@ opcodes:
     source: "rej09b0318:section-9:fipr"
     pattern: "1111nnmm11101101"
     fields: { n: vecreg, m: vecreg }
-    defs: [fvn]
+    defs: [fvn, fpscr]
     uses: [fvm, fvn, fpscr]
 
   # FTRV — matrix-vector multiply
@@ -2367,7 +2366,7 @@ opcodes:
     source: "rej09b0318:section-9:ftrv"
     pattern: "1111nn0111111101"
     fields: { n: vecreg }
-    defs: [fvn]
+    defs: [fvn, fpscr]
     uses: [xmtrx, fvn, fpscr]
 
   # FSCHG / FRCHG — toggle FPSCR bits

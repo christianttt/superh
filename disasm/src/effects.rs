@@ -74,8 +74,10 @@ pub enum FpuResource {
     Vector(VecReg),
     /// Four-lane XF-bank vector view.
     XVector(VecReg),
-    /// XMTRX matrix view over the XF bank.
+    /// Matrix view over physical bank 1, selected by XMTRX when FPSCR.FR is clear.
     Matrix,
+    /// Matrix view over physical bank 0, selected by XMTRX when FPSCR.FR is set.
+    XMatrix,
 }
 
 /// A register or architectural resource used by an instruction.
@@ -346,13 +348,13 @@ impl EffectsBuilder {
         }
     }
 
-    fn insert_read(&mut self, resource: Resource, definite: bool) {
+    pub(crate) fn insert_read(&mut self, resource: Resource, definite: bool) {
         self.effects.may_read.insert(resource);
         if definite {
             self.effects.must_read.insert(resource);
         }
     }
-    fn insert_write(&mut self, resource: Resource, definite: bool) {
+    pub(crate) fn insert_write(&mut self, resource: Resource, definite: bool) {
         self.effects.may_write.insert(resource);
         if definite {
             self.effects.must_write.insert(resource);
@@ -493,6 +495,18 @@ impl EffectsBuilder {
             None => {
                 self.fpu(FpuResource::Vector(reg), write, false);
                 self.fpu(FpuResource::XVector(reg), write, false);
+            }
+        }
+    }
+
+    #[cfg(feature = "sh4")]
+    pub(crate) fn read_matrix(&mut self) {
+        match self.context.fpscr.fr {
+            Some(false) => self.fpu(FpuResource::Matrix, false, true),
+            Some(true) => self.fpu(FpuResource::XMatrix, false, true),
+            None => {
+                self.fpu(FpuResource::Matrix, false, false);
+                self.fpu(FpuResource::XMatrix, false, false);
             }
         }
     }

@@ -95,9 +95,9 @@ checksum = "3d3067d79b975e8844ca9eb072e16b31c3c1c36928edf9c6789548c524d0d954"
 
 [[package]]
 name = "indexmap"
-version = "2.14.0"
+version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
+checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.0",
@@ -152,7 +152,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bfe0f4c752e450fc2faf62654f1c134747922825d5b04ca717b8874f41a40c0"
 dependencies = [
  "proc-macro2",
- "syn 3.0.3",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -235,7 +235,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -266,11 +266,11 @@ dependencies = [
 
 [[package]]
 name = "superh"
-version = "0.2.2"
+version = "0.2.4"
 
 [[package]]
 name = "superh-fuzz"
-version = "0.2.2"
+version = "0.2.4"
 dependencies = [
  "rand",
  "superh",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "superh-generator"
-version = "0.2.2"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "indexmap",
@@ -287,7 +287,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_yaml",
- "syn 3.0.3",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.3"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3"
+checksum = "12df2e0110f65b775f769bb17ef989067a1d931b2eb822bd4346631eeada89f9"
 dependencies = [
  "proc-macro2",
  "quote",
