@@ -5,9 +5,9 @@ use alloc::string::String;
 use crate::{Data, DecodeResult, FormatIns, FormatOptions, LocatedIns};
 
 /// A formatter backed by [`core::fmt::Formatter`].
-struct Formatter<'a, 'b> {
-    options: &'a FormatOptions,
-    formatter: &'a mut core::fmt::Formatter<'b>,
+pub(crate) struct Formatter<'a, 'b> {
+    pub(crate) options: &'a FormatOptions,
+    pub(crate) formatter: &'a mut core::fmt::Formatter<'b>,
 }
 
 impl core::fmt::Write for Formatter<'_, '_> {

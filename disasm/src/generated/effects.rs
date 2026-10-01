@@ -1663,6 +1663,21 @@ impl Ins {
                 effects.read(Resource::System(SystemReg::Fpscr));
             }
             #[cfg(feature = "sh4")]
+            Self::FsrraFrn { frn, .. } => {
+                effects.write_freg(*frn);
+                effects.write(Resource::System(SystemReg::Fpscr));
+                effects.read_freg(*frn);
+                effects.read(Resource::System(SystemReg::Fpscr));
+            }
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn { drn, .. } => {
+                effects.write_freg(crate::FReg::from_u8(drn.number()));
+                effects.write_freg(crate::FReg::from_u8(drn.number() + 1));
+                effects.write(Resource::System(SystemReg::Fpscr));
+                effects.read(Resource::System(SystemReg::Fpul));
+                effects.read(Resource::System(SystemReg::Fpscr));
+            }
+            #[cfg(feature = "sh4")]
             Self::Fschg => {
                 effects.write(Resource::System(SystemReg::Fpscr));
                 effects.read(Resource::System(SystemReg::Fpscr));

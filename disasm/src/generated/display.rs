@@ -54,6 +54,20 @@ pub trait FormatIns: core::fmt::Write {
         self.write_str(reg.name())
     }
     #[cfg(feature = "sh4")]
+    /// Write an alternate-bank register pair.
+    fn write_xdreg(&mut self, reg: DReg) -> core::fmt::Result {
+        write!(self, "xd{}", reg.number())
+    }
+    #[cfg(feature = "sh4")]
+    /// Write an interpreted architectural floating-point register.
+    fn write_fpu_register(&mut self, reg: crate::FpuRegister) -> core::fmt::Result {
+        match reg {
+            crate::FpuRegister::Single(reg) => self.write_freg(reg),
+            crate::FpuRegister::Double(reg) => self.write_dreg(reg),
+            crate::FpuRegister::ExtendedDouble(reg) => self.write_xdreg(reg),
+        }
+    }
+    #[cfg(feature = "sh4")]
     /// Write a vector register view.
     fn write_vecreg(&mut self, reg: VecReg) -> core::fmt::Result {
         self.write_str(reg.name())
@@ -98,6 +112,332 @@ pub trait FormatIns: core::fmt::Write {
     }
 }
 impl Ins {
+    #[cfg(feature = "sh4")]
+    pub(crate) fn operand_mode(
+        &self,
+        fpscr: crate::FpscrState,
+    ) -> Result<crate::interpret::OperandMode, crate::InterpretationError> {
+        use crate::interpret::ModeRequirement;
+        let requirement = match self {
+            #[cfg(feature = "sh4")]
+            Self::FaddFrmFrn { frn, frm, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn, *frm]
+                        .into_iter()
+                        .find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FsubFrmFrn { frn, frm, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn, *frm]
+                        .into_iter()
+                        .find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmulFrmFrn { frn, frm, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn, *frm]
+                        .into_iter()
+                        .find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FdivFrmFrn { frn, frm, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn, *frm]
+                        .into_iter()
+                        .find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FcmpeqFrmFrn { frn, frm, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn, *frm]
+                        .into_iter()
+                        .find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FcmpgtFrmFrn { frn, frm, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn, *frm]
+                        .into_iter()
+                        .find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovAtR0RmFrn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmAtR0Rn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FmovAtRmFrn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FmovAtRmIncFrn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmAtRn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmAtDecRn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmFrn { .. } => ModeRequirement::Transfer,
+            #[cfg(feature = "sh4")]
+            Self::FstsFpulFrn { .. } => ModeRequirement::Fixed,
+            #[cfg(feature = "sh4")]
+            Self::FldsFrnFpul { .. } => ModeRequirement::Fixed,
+            #[cfg(feature = "sh4")]
+            Self::FloatFpulFrn { frn, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn].into_iter().find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FtrcFrnFpul { frn, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn].into_iter().find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FnegFrn { frn, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn].into_iter().find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FabsFrn { frn, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn].into_iter().find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::FsqrtFrn { frn, .. } => {
+                ModeRequirement::Precision {
+                    odd_operand: [*frn].into_iter().find(|reg| reg.number() & 1 != 0),
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Self::Fldi0Frn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::Fldi1Frn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FmacFr0FrmFrn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FcnvsdFpulDrn { .. } => ModeRequirement::DoubleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FcnvdsDrnFpul { .. } => ModeRequirement::DoubleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FiprFvmFvn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FtrvXmtrxFvn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FsrraFrn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn { .. } => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::Fschg => ModeRequirement::SingleOnly,
+            #[cfg(feature = "sh4")]
+            Self::Frchg => ModeRequirement::SingleOnly,
+            _ => ModeRequirement::NonFpu,
+        };
+        requirement.resolve(fpscr)
+    }
+    #[cfg(feature = "sh4")]
+    pub(crate) fn write_interpreted_at<W: FormatIns + ?Sized>(
+        &self,
+        out: &mut W,
+        address: u32,
+        mode: crate::interpret::OperandMode,
+    ) -> core::fmt::Result {
+        if matches!(mode, crate ::interpret::OperandMode::TransferPair) {
+            out.write_str("fmov")?;
+        } else {
+            self.write_opcode(out)?;
+        }
+        match self {
+            #[cfg(feature = "sh4")]
+            Self::FaddFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FsubFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmulFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FdivFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FcmpeqFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FcmpgtFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovAtR0RmFrn { frn, rm } => {
+                out.write_space()?;
+                out.write_str("@(r0, ")?;
+                out.write_reg(*rm)?;
+                out.write_str("), ")?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmAtR0Rn { rn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_str(", @(r0, ")?;
+                out.write_reg(*rn)?;
+                out.write_str(")")?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovAtRmFrn { frn, rm } => {
+                out.write_space()?;
+                out.write_str("@")?;
+                out.write_reg(*rm)?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovAtRmIncFrn { frn, rm } => {
+                out.write_space()?;
+                out.write_str("@")?;
+                out.write_reg(*rm)?;
+                out.write_str("+, ")?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmAtRn { rn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_str(", @")?;
+                out.write_reg(*rn)?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmAtDecRn { rn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_str(", @-")?;
+                out.write_reg(*rn)?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmovFrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FstsFpulFrn { frn } => {
+                out.write_space()?;
+                out.write_str("fpul, ")?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FldsFrnFpul { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                out.write_str(", fpul")?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FloatFpulFrn { frn } => {
+                out.write_space()?;
+                out.write_str("fpul, ")?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FtrcFrnFpul { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                out.write_str(", fpul")?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FnegFrn { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FabsFrn { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FsqrtFrn { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::Fldi0Frn { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::Fldi1Frn { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FmacFr0FrmFrn { frn, frm } => {
+                out.write_space()?;
+                out.write_str("fr0, ")?;
+                out.write_fpu_register(mode.register(*frm))?;
+                out.write_separator()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FsrraFrn { frn } => {
+                out.write_space()?;
+                out.write_fpu_register(mode.register(*frn))?;
+                Ok(())
+            }
+            _ => self.write_params_at(out, address),
+        }
+    }
     /// Write only the mnemonic.
     pub fn write_opcode<W: FormatIns + ?Sized>(&self, out: &mut W) -> core::fmt::Result {
         match self {
@@ -378,6 +718,10 @@ impl Ins {
             Self::FiprFvmFvn { .. } => out.write_str("fipr"),
             #[cfg(feature = "sh4")]
             Self::FtrvXmtrxFvn { .. } => out.write_str("ftrv"),
+            #[cfg(feature = "sh4")]
+            Self::FsrraFrn { .. } => out.write_str("fsrra"),
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn { .. } => out.write_str("fsca"),
             #[cfg(feature = "sh4")]
             Self::Fschg => out.write_str("fschg"),
             #[cfg(feature = "sh4")]
@@ -1820,6 +2164,19 @@ impl Ins {
                 out.write_space()?;
                 out.write_str("xmtrx, ")?;
                 out.write_vecreg(*fvn)?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FsrraFrn { frn } => {
+                out.write_space()?;
+                out.write_freg(*frn)?;
+                Ok(())
+            }
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn { drn } => {
+                out.write_space()?;
+                out.write_str("fpul, ")?;
+                out.write_dreg(*drn)?;
                 Ok(())
             }
             #[cfg(feature = "sh4")]

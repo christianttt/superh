@@ -2239,6 +2239,16 @@ const fn decode_groupf(word: u16, options: &DecodeOptions) -> DecodeResult {
                 return DecodeResult::Unknown(word);
             }
             #[cfg(feature = "sh4")]
+            if (word & 0xf1ff) == 0xf0fd {
+                const ARCHITECTURES: ArchitectureSet = ArchitectureSet::from_bits(8u8);
+                if ARCHITECTURES.contains(options.architecture) {
+                    return DecodeResult::Instruction(Ins::FscaFpulDrn {
+                        drn: DReg::from_u8(((word >> 9u8) & 7u16) as u8),
+                    });
+                }
+                return DecodeResult::Unknown(word);
+            }
+            #[cfg(feature = "sh4")]
             if (word & 0xf0ff) == 0xf00d {
                 const ARCHITECTURES: ArchitectureSet = ArchitectureSet::from_bits(8u8);
                 if ARCHITECTURES.contains(options.architecture) {
@@ -2335,6 +2345,16 @@ const fn decode_groupf(word: u16, options: &DecodeOptions) -> DecodeResult {
                     return DecodeResult::Instruction(Ins::FiprFvmFvn {
                         fvn: VecReg::from_u8(((word >> 10u8) & 3u16) as u8),
                         fvm: VecReg::from_u8(((word >> 8u8) & 3u16) as u8),
+                    });
+                }
+                return DecodeResult::Unknown(word);
+            }
+            #[cfg(feature = "sh4")]
+            if (word & 0xf0ff) == 0xf07d {
+                const ARCHITECTURES: ArchitectureSet = ArchitectureSet::from_bits(8u8);
+                if ARCHITECTURES.contains(options.architecture) {
+                    return DecodeResult::Instruction(Ins::FsrraFrn {
+                        frn: FReg::from_u8(((word >> 8u8) & 15u16) as u8),
                     });
                 }
                 return DecodeResult::Unknown(word);
@@ -4968,6 +4988,32 @@ impl Opcode {
                 {
                     Some(Ins::FtrvXmtrxFvn {
                         fvn: VecReg::from_u8(((word >> 10u8) & 3u16) as u8),
+                    })
+                } else {
+                    None
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Opcode::FsrraFrn => {
+                const ARCHITECTURES: ArchitectureSet = ArchitectureSet::from_bits(8u8);
+                if (word & 0xf0ff) == 0xf07d
+                    && ARCHITECTURES.contains(options.architecture)
+                {
+                    Some(Ins::FsrraFrn {
+                        frn: FReg::from_u8(((word >> 8u8) & 15u16) as u8),
+                    })
+                } else {
+                    None
+                }
+            }
+            #[cfg(feature = "sh4")]
+            Opcode::FscaFpulDrn => {
+                const ARCHITECTURES: ArchitectureSet = ArchitectureSet::from_bits(8u8);
+                if (word & 0xf1ff) == 0xf0fd
+                    && ARCHITECTURES.contains(options.architecture)
+                {
+                    Some(Ins::FscaFpulDrn {
+                        drn: DReg::from_u8(((word >> 9u8) & 7u16) as u8),
                     })
                 } else {
                     None

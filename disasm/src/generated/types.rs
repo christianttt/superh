@@ -445,7 +445,7 @@ pub enum Architecture {
     /// SH-3.
     #[cfg(feature = "sh3")]
     Sh3 = 2,
-    /// SH-4, excluding SH-4A-only encodings.
+    /// SH-4, including the SH7091 FSRRA and FSCA FPU instructions.
     #[cfg(feature = "sh4")]
     Sh4 = 3,
 }
@@ -1033,6 +1033,12 @@ pub enum Opcode {
     ///`ftrv xmtrx, {fvn}` (rej09b0318:section-9:ftrv)
     #[cfg(feature = "sh4")]
     FtrvXmtrxFvn = 218u16,
+    ///`fsrra {frn}` (sh7091priv:section-fpu:fsrra)
+    #[cfg(feature = "sh4")]
+    FsrraFrn = 219u16,
+    ///`fsca fpul, {drn}` (sh7091priv:section-fpu:fsca)
+    #[cfg(feature = "sh4")]
+    FscaFpulDrn = 220u16,
     ///`fschg ` (rej09b0318:section-9:fschg)
     #[cfg(feature = "sh4")]
     Fschg = 221u16,
@@ -1326,6 +1332,10 @@ impl Opcode {
             #[cfg(feature = "sh4")]
             218u16 => Some(Self::FtrvXmtrxFvn),
             #[cfg(feature = "sh4")]
+            219u16 => Some(Self::FsrraFrn),
+            #[cfg(feature = "sh4")]
+            220u16 => Some(Self::FscaFpulDrn),
+            #[cfg(feature = "sh4")]
             221u16 => Some(Self::Fschg),
             #[cfg(feature = "sh4")]
             222u16 => Some(Self::Frchg),
@@ -1612,6 +1622,10 @@ impl Opcode {
             Self::FiprFvmFvn => ArchitectureSet::from_bits(8u8),
             #[cfg(feature = "sh4")]
             Self::FtrvXmtrxFvn => ArchitectureSet::from_bits(8u8),
+            #[cfg(feature = "sh4")]
+            Self::FsrraFrn => ArchitectureSet::from_bits(8u8),
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn => ArchitectureSet::from_bits(8u8),
             #[cfg(feature = "sh4")]
             Self::Fschg => ArchitectureSet::from_bits(8u8),
             #[cfg(feature = "sh4")]
@@ -2862,6 +2876,18 @@ pub enum Ins {
         ///Decoded `fvn` operand.
         fvn: VecReg,
     },
+    ///`fsrra {frn}` (sh7091priv:section-fpu:fsrra)
+    #[cfg(feature = "sh4")]
+    FsrraFrn {
+        ///Decoded `frn` operand.
+        frn: FReg,
+    },
+    ///`fsca fpul, {drn}` (sh7091priv:section-fpu:fsca)
+    #[cfg(feature = "sh4")]
+    FscaFpulDrn {
+        ///Decoded `drn` operand.
+        drn: DReg,
+    },
     ///`fschg ` (rej09b0318:section-9:fschg)
     #[cfg(feature = "sh4")]
     Fschg,
@@ -3150,6 +3176,10 @@ impl Ins {
             Self::FiprFvmFvn { .. } => Opcode::FiprFvmFvn,
             #[cfg(feature = "sh4")]
             Self::FtrvXmtrxFvn { .. } => Opcode::FtrvXmtrxFvn,
+            #[cfg(feature = "sh4")]
+            Self::FsrraFrn { .. } => Opcode::FsrraFrn,
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn { .. } => Opcode::FscaFpulDrn,
             #[cfg(feature = "sh4")]
             Self::Fschg => Opcode::Fschg,
             #[cfg(feature = "sh4")]

@@ -769,3 +769,55 @@ fn trapa_models_sh4_register_entry_with_sgr() {
     assert!(effects.must_write().contains(Resource::System(SystemReg::Expevt)));
     assert_eq!(effects.memory().count(), 0);
 }
+
+#[test]
+#[cfg(feature = "sh4")]
+fn fpu_approximations_resolve_single_precision_lanes_and_fpscr() {
+    use superh::FReg;
+
+    // Hitachi SH7091 private FPU supplement: FSRRA reads/writes FRn;
+    // FSCA reads FPUL and writes FRn and FR[n+1], with even n.
+    for n in 0_u8..16 {
+        for fsca in [false, true] {
+            if fsca && n % 2 != 0 {
+                continue;
+            }
+            let word = (if fsca { 0xf0fd } else { 0xf07d }) | (u16::from(n) << 8);
+            for fr in [Some(false), Some(true), None] {
+                let context = EffectContext::new(Architecture::Sh4).with_fpscr(FpscrState::new(
+                    Some(false),
+                    None,
+                    fr,
+                ));
+                let effects = instruction(word).effects(context);
+                let fpscr = Resource::System(SystemReg::Fpscr);
+                assert!(effects.must_read().contains(fpscr));
+                assert!(effects.must_write().contains(fpscr));
+                let fpul = Resource::System(SystemReg::Fpul);
+                assert_eq!(effects.must_read().contains(fpul), fsca);
+                assert_eq!(effects.may_read().contains(fpul), fsca);
+                for lane in 0_u8..16 {
+                    let reg = FReg::from_number(lane).expect("valid lane");
+                    for (bank, resource) in [
+                        (false, Resource::Fpu(FpuResource::Fr(reg))),
+                        (true, Resource::Fpu(FpuResource::Xf(reg))),
+                    ] {
+                        let selected = fr == Some(bank);
+                        let possible = fr.is_none() || selected;
+                        let read = !fsca && lane == n;
+                        let write = lane == n || (fsca && lane == n + 1);
+                        assert_eq!(effects.must_read().contains(resource), read && selected);
+                        assert_eq!(effects.may_read().contains(resource), read && possible);
+                        assert_eq!(effects.must_write().contains(resource), write && selected);
+                        assert_eq!(effects.may_write().contains(resource), write && possible);
+                    }
+                }
+                let lanes = if fsca { 2 } else { 1 };
+                assert_eq!(effects.must_write().len(), 1 + if fr.is_some() { lanes } else { 0 });
+                assert_eq!(effects.may_write().len(), 1 + lanes * if fr.is_some() { 1 } else { 2 });
+                assert_eq!(effects.must_read().len(), if fsca || fr.is_some() { 2 } else { 1 });
+                assert_eq!(effects.may_read().len(), if fsca || fr.is_some() { 2 } else { 3 });
+            }
+        }
+    }
+}

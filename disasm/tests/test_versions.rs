@@ -47,9 +47,42 @@ fn sh4a_only_sgr_loads_are_not_sh4() {
 
 #[test]
 #[cfg(feature = "sh4")]
-fn sh4a_only_fpu_approximations_are_not_sh4() {
-    assert_eq!(decode_for(0xf17d, Architecture::Sh4), DecodeResult::Unknown(0xf17d));
-    assert_eq!(decode_for(0xf0fd, Architecture::Sh4), DecodeResult::Unknown(0xf0fd));
+fn sh4_fpu_approximations_decode_and_round_trip() {
+    for n in 0_u16..16 {
+        for (word, text) in [
+            (0xf07d | (n << 8), format!("fsrra fr{n}")),
+            (0xf0fd | (n << 8), format!("fsca fpul, dr{n}")),
+        ] {
+            if word & 0xff == 0xfd && n % 2 != 0 {
+                continue; // Odd destinations share encodings with FTRV/FSCHG/FRCHG.
+            }
+            let result = decode_for(word, Architecture::Sh4);
+            let ins = result.instruction().expect("SH-4 FPU approximation");
+            assert_eq!(ins.encode(), Some(word));
+            assert_eq!(ins.at(0).display(&superh::FormatOptions::default()).to_string(), text);
+            assert_eq!(decode_for(word, Architecture::Sh3), DecodeResult::Unknown(word));
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "sh4")]
+fn fsca_does_not_claim_odd_destination_encodings() {
+    use superh::VecReg;
+
+    for (word, expected) in [
+        (0xf1fd, Ins::FtrvXmtrxFvn { fvn: VecReg::Fv0 }),
+        (0xf5fd, Ins::FtrvXmtrxFvn { fvn: VecReg::Fv4 }),
+        (0xf9fd, Ins::FtrvXmtrxFvn { fvn: VecReg::Fv8 }),
+        (0xfdfd, Ins::FtrvXmtrxFvn { fvn: VecReg::Fv12 }),
+        (0xf3fd, Ins::Fschg),
+        (0xfbfd, Ins::Frchg),
+    ] {
+        assert_eq!(decode_for(word, Architecture::Sh4), DecodeResult::Instruction(expected));
+    }
+    for word in [0xf7fd, 0xfffd] {
+        assert_eq!(decode_for(word, Architecture::Sh4), DecodeResult::Unknown(word));
+    }
 }
 
 #[test]

@@ -32,10 +32,14 @@ impl Isa {
             if op.source.trim().is_empty() || !op.source.contains(":section-") {
                 bail!("Opcode '{}': invalid source citation '{}'", op.name, op.source);
             }
-            let valid_source =
-                ["rej09b0171:section-6:", "sh3-rev4:section-8:", "rej09b0318:section-9:"]
-                    .iter()
-                    .any(|prefix| op.source.starts_with(prefix));
+            let valid_source = [
+                "rej09b0171:section-6:",
+                "sh3-rev4:section-8:",
+                "rej09b0318:section-9:",
+                "sh7091priv:section-fpu:",
+            ]
+            .iter()
+            .any(|prefix| op.source.starts_with(prefix));
             if !valid_source {
                 bail!("Opcode '{}': unknown source manual '{}'", op.name, op.source);
             }

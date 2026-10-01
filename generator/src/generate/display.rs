@@ -5,7 +5,14 @@ use quote::{format_ident, quote};
 
 pub fn generate_display(isa: &Isa) -> TokenStream {
     let opcodes = isa.opcodes.iter().map(opcode_arm);
-    let params = isa.opcodes.iter().map(params_arm);
+    let params = isa.opcodes.iter().map(|op| params_arm(op, false));
+    let interpreted_params = isa
+        .opcodes
+        .iter()
+        .filter(|op| op.fields.values().any(|field| *field == FieldType::Freg))
+        .map(|op| params_arm(op, true));
+    let modes = isa.opcodes.iter().filter(|op| op.opcode.starts_with('f')).map(mode_arm);
+
     quote! {
         use crate::{Address, Disp, FormatOptions, ImmediateRadix, Ins, Reg};
         #[cfg(feature = "sh3")]
@@ -34,6 +41,20 @@ pub fn generate_display(isa: &Isa) -> TokenStream {
             #[cfg(feature = "sh4")]
             /// Write a double-precision register view.
             fn write_dreg(&mut self, reg: DReg) -> core::fmt::Result { self.write_str(reg.name()) }
+            #[cfg(feature = "sh4")]
+            /// Write an alternate-bank register pair.
+            fn write_xdreg(&mut self, reg: DReg) -> core::fmt::Result {
+                write!(self, "xd{}", reg.number())
+            }
+            #[cfg(feature = "sh4")]
+            /// Write an interpreted architectural floating-point register.
+            fn write_fpu_register(&mut self, reg: crate::FpuRegister) -> core::fmt::Result {
+                match reg {
+                    crate::FpuRegister::Single(reg) => self.write_freg(reg),
+                    crate::FpuRegister::Double(reg) => self.write_dreg(reg),
+                    crate::FpuRegister::ExtendedDouble(reg) => self.write_xdreg(reg),
+                }
+            }
             #[cfg(feature = "sh4")]
             /// Write a vector register view.
             fn write_vecreg(&mut self, reg: VecReg) -> core::fmt::Result { self.write_str(reg.name()) }
@@ -74,6 +95,31 @@ pub fn generate_display(isa: &Isa) -> TokenStream {
         }
 
         impl Ins {
+            #[cfg(feature = "sh4")]
+            pub(crate) fn operand_mode(
+                &self,
+                fpscr: crate::FpscrState,
+            ) -> Result<crate::interpret::OperandMode, crate::InterpretationError> {
+                use crate::interpret::ModeRequirement;
+                let requirement = match self {
+                    #(#modes,)*
+                    _ => ModeRequirement::NonFpu,
+                };
+                requirement.resolve(fpscr)
+            }
+
+            #[cfg(feature = "sh4")]
+            pub(crate) fn write_interpreted_at<W: FormatIns + ?Sized>(
+                &self, out: &mut W, address: u32, mode: crate::interpret::OperandMode,
+            ) -> core::fmt::Result {
+                if matches!(mode, crate::interpret::OperandMode::TransferPair) {
+                    out.write_str("fmov")?;
+                } else {
+                    self.write_opcode(out)?;
+                }
+                match self { #(#interpreted_params,)* _ => self.write_params_at(out, address) }
+            }
+
             /// Write only the mnemonic.
             pub fn write_opcode<W: FormatIns + ?Sized>(&self, out: &mut W) -> core::fmt::Result {
                 match self { #(#opcodes,)* }
@@ -102,7 +148,7 @@ fn opcode_arm(op: &Opcode) -> TokenStream {
     quote! { #cfg #pattern => out.write_str(#mnemonic) }
 }
 
-fn params_arm(op: &Opcode) -> TokenStream {
+fn params_arm(op: &Opcode, interpreted: bool) -> TokenStream {
     let name = format_ident!("{}", op.name);
     let cfg = architecture_cfg(op);
     let fields: Vec<_> =
@@ -112,11 +158,11 @@ fn params_arm(op: &Opcode) -> TokenStream {
     } else {
         quote! { Self::#name { #(#fields,)* } }
     };
-    let body = params_body(op);
+    let body = params_body(op, interpreted);
     quote! { #cfg #pattern => { #body Ok(()) } }
 }
 
-fn params_body(op: &Opcode) -> TokenStream {
+fn params_body(op: &Opcode, interpreted: bool) -> TokenStream {
     if op.args.is_empty() {
         return quote! {};
     }
@@ -127,13 +173,15 @@ fn params_body(op: &Opcode) -> TokenStream {
                 statements.push(quote! { out.write_separator()?; })
             }
             Segment::Literal(value) => statements.push(quote! { out.write_str(#value)?; }),
-            Segment::Placeholder(value) => statements.push(write_placeholder(&value, op)),
+            Segment::Placeholder(value) => {
+                statements.push(write_placeholder(&value, op, interpreted))
+            }
         }
     }
     quote! { #(#statements)* }
 }
 
-fn write_placeholder(name: &str, op: &Opcode) -> TokenStream {
+fn write_placeholder(name: &str, op: &Opcode, interpreted: bool) -> TokenStream {
     if name == "pc" {
         return quote! { out.write_str("pc")?; };
     }
@@ -144,6 +192,9 @@ fn write_placeholder(name: &str, op: &Opcode) -> TokenStream {
     let ident = format_ident!("{}", name);
     match field {
         FieldType::Reg => quote! { out.write_reg(*#ident)?; },
+        FieldType::Freg if interpreted => {
+            quote! { out.write_fpu_register(mode.register(*#ident))?; }
+        }
         FieldType::Freg => quote! { out.write_freg(*#ident)?; },
         FieldType::Dreg => quote! { out.write_dreg(*#ident)?; },
         FieldType::Vecreg => quote! { out.write_vecreg(*#ident)?; },
@@ -234,4 +285,42 @@ fn parse_format(value: &str) -> Vec<Segment> {
         result.push(Segment::Literal(literal));
     }
     result
+}
+
+fn mode_arm(op: &Opcode) -> TokenStream {
+    let name = format_ident!("{}", op.name);
+    let cfg = architecture_cfg(op);
+    let fields: Vec<_> = op
+        .fields
+        .iter()
+        .filter(|(_, field)| **field == FieldType::Freg)
+        .map(|(letter, _)| format_ident!("{}", op.letter_to_param(*letter)))
+        .collect();
+    let precision = super::effects::precision_dependent(op);
+    let pattern = if precision {
+        quote! { Self::#name { #(#fields,)* .. } }
+    } else if op.fields.is_empty() {
+        quote! { Self::#name }
+    } else {
+        quote! { Self::#name { .. } }
+    };
+    let requirement = if precision {
+        quote! {
+            ModeRequirement::Precision {
+                odd_operand: [#(*#fields,)*].into_iter().find(|reg| reg.number() & 1 != 0),
+            }
+        }
+    } else if matches!(op.opcode.as_str(), "fmov" | "fmov.s") {
+        quote! { ModeRequirement::Transfer }
+    } else if matches!(op.opcode.as_str(), "fcnvds" | "fcnvsd") {
+        quote! { ModeRequirement::DoubleOnly }
+    } else if matches!(
+        op.opcode.as_str(),
+        "fldi0" | "fldi1" | "fmac" | "fipr" | "ftrv" | "fsrra" | "fsca" | "fschg" | "frchg"
+    ) {
+        quote! { ModeRequirement::SingleOnly }
+    } else {
+        quote! { ModeRequirement::Fixed }
+    };
+    quote! { #cfg #pattern => #requirement }
 }

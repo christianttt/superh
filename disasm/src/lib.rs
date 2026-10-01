@@ -11,6 +11,10 @@ mod effects;
 mod fmt;
 mod generated;
 mod ins;
+#[cfg(feature = "sh4")]
+mod interpret;
+#[cfg(feature = "sh4")]
+pub use interpret::{DisplayInterpretedIns, FpuRegister, InterpretationError, InterpretedIns};
 mod parser;
 
 pub(crate) use effects::EffectsBuilder;

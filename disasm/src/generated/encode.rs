@@ -830,6 +830,12 @@ impl Ins {
                 Some(0xf1fd | (((fvn.number() / 4) as u16 & 0x3) << 10u8))
             }
             #[cfg(feature = "sh4")]
+            Self::FsrraFrn { frn } => Some(0xf07d | ((frn.number() as u16 & 0xf) << 8u8)),
+            #[cfg(feature = "sh4")]
+            Self::FscaFpulDrn { drn } => {
+                Some(0xf0fd | (((drn.number() / 2) as u16 & 0x7) << 9u8))
+            }
+            #[cfg(feature = "sh4")]
             Self::Fschg => Some(0xf3fd),
             #[cfg(feature = "sh4")]
             Self::Frchg => Some(0xfbfd),

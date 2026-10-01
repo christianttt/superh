@@ -2369,6 +2369,29 @@ opcodes:
     defs: [fvn, fpscr]
     uses: [xmtrx, fvn, fpscr]
 
+  # SH7091 FPU approximations; PR=1 is reserved.
+  - name: FsrraFrn
+    id: 219
+    opcode: "fsrra"
+    args: "{frn}"
+    architectures: [sh4]
+    source: "sh7091priv:section-fpu:fsrra"
+    pattern: "1111nnnn01111101"
+    fields: { n: freg }
+    defs: [frn, fpscr]
+    uses: [frn, fpscr]
+
+  - name: FscaFpulDrn
+    id: 220
+    opcode: "fsca"
+    args: "fpul, {drn}"
+    architectures: [sh4]
+    source: "sh7091priv:section-fpu:fsca"
+    pattern: "1111nnn011111101"
+    fields: { n: dreg }
+    defs: [drn, fpscr]
+    uses: [fpul, fpscr]
+
   # FSCHG / FRCHG — toggle FPSCR bits
   - name: Fschg
     id: 221

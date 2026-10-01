@@ -50,6 +50,42 @@ let instruction = Opcode::MovRmRn
 assert_eq!(instruction.opcode(), Opcode::MovRmRn);
 ```
 
+## Caller-supplied FPSCR interpretation
+
+With the SH-4 feature enabled, interpret an instruction using FPSCR bits supplied
+by your debugger or analysis tool. Interpretation does not track CPU state.
+
+```rust
+# #[cfg(feature = "sh4")]
+# {
+use superh::{DecodeOptions, FormatOptions, FpscrState, decode};
+
+let decoded = decode(0xf020, &DecodeOptions::default());
+let ins = decoded.instruction().expect("fadd");
+let interpreted = ins
+    .interpret(FpscrState::new(Some(true), Some(false), None))
+    .expect("known double-precision mode");
+assert_eq!(
+    interpreted.at(0x8c01_0000).display(&FormatOptions::default()).to_string(),
+    "fadd dr2, dr0",
+);
+assert_eq!(interpreted.instruction().encode(), Some(0xf020));
+# }
+```
+
+PR selects arithmetic precision; SZ selects FMOV transfer width. Paired FMOV
+operands render as DR or XD according to their encoded register bits. FR affects
+physical-bank analysis, not architectural assembly names.
+
+Missing required bits return a typed InterpretationError. Known reserved modes
+and invalid precision operands also return errors. Unrelated unknown bits are
+allowed, so successful interpretation is not a complete execution-validity check.
+The original instruction and its default formatting remain available.
+
+InterpretedIns::write uses the structured FormatIns callbacks, including
+write_fpu_register and write_xdreg, so consumers can inspect resolved operands
+without parsing formatted text.
+
 ## Streaming parser
 
 `Parser` yields source offset, mapped address, byte size, the original word,

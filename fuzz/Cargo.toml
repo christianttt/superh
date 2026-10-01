@@ -1,6 +1,6 @@
 [package]
 name = "superh-fuzz"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 description = "Fuzzer for superh"
 publish = false
@@ -13,5 +13,5 @@ name = "superh-fuzz"
 path = "src/main.rs"
 
 [dependencies]
-rand = "0.10.2"
+rand = "0.10.3"
 superh = { path = "../disasm" }

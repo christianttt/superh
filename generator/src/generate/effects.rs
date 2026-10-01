@@ -139,6 +139,13 @@ fn field_effect(
         }
         FieldType::Freg if write => quote! { effects.write_freg(*#ident); },
         FieldType::Freg => quote! { effects.read_freg(*#ident); },
+        FieldType::Dreg if write && op.name == "FscaFpulDrn" => {
+            // FSCA writes two single-precision lanes, despite its DR operand spelling.
+            quote! {
+                effects.write_freg(crate::FReg::from_u8(#ident.number()));
+                effects.write_freg(crate::FReg::from_u8(#ident.number() + 1));
+            }
+        }
         FieldType::Dreg if write => quote! { effects.write_dreg(*#ident); },
         FieldType::Dreg => quote! { effects.read_dreg(*#ident); },
         FieldType::Vecreg if write && op.name == "FiprFvmFvn" => {
@@ -151,7 +158,7 @@ fn field_effect(
     }
 }
 
-fn precision_dependent(op: &Opcode) -> bool {
+pub(crate) fn precision_dependent(op: &Opcode) -> bool {
     matches!(
         op.opcode.as_str(),
         "fadd"

@@ -286,7 +286,7 @@ fn gen_architecture() -> TokenStream {
             #[cfg(feature = "sh2")] Sh2 = 1,
             /// SH-3.
             #[cfg(feature = "sh3")] Sh3 = 2,
-            /// SH-4, excluding SH-4A-only encodings.
+            /// SH-4, including the SH7091 FSRRA and FSCA FPU instructions.
             #[cfg(feature = "sh4")] Sh4 = 3,
         }
         impl Architecture {
